@@ -1,0 +1,17 @@
+{
+  "name": "gradify",
+  "version": "1.0.0",
+  "description": "Gradify - Academic & Computer Science Super-App for university students",
+  "main": "server/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "keywords": ["academic", "student", "gpa", "cs-toolkit"],
+  "author": "Student Developer Team - FIKOM UNIKA UST Medan",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

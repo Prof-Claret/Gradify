@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gradify — Simplify Your Academic Journey</title>
+  <meta name="description" content="Gradify adalah Academic & Computer Science Super-App untuk mahasiswa UNIKA UST dan universitas lainnya." />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81'
+            }
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+
+  <!-- Markdown + Syntax highlighting (Catatan Perkuliahan CS) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js"></script>
+
+  <!-- MathJax LaTeX Renderer -->
+  <script>
+    window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache: 'global' } };
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>" />
+</head>
+<body class="bg-slate-100 font-sans text-slate-800">
+
+  <!-- Splash -->
+  <div id="splash" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-700 text-white">
+    <div class="text-6xl mb-4 animate-bounce">🎓</div>
+    <h1 class="text-3xl font-extrabold tracking-tight">Gradify</h1>
+    <p class="mt-2 text-indigo-200 italic">Simplify Your Academic Journey</p>
+  </div>
+
+  <!-- Auth overlay (login/register) -->
+  <div id="auth-screen" class="hidden fixed inset-0 z-40 overflow-y-auto bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900"></div>
+
+  <!-- App shell -->
+  <div id="app-shell" class="hidden min-h-screen lg:flex">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 w-64 -translate-x-full lg:translate-x-0 transform bg-slate-900 text-slate-300 transition-transform duration-200 flex flex-col">
+      <div class="flex items-center gap-3 px-5 h-16 border-b border-slate-800">
+        <span class="text-2xl">🎓</span>
+        <div>
+          <p class="text-white font-bold leading-tight">Gradify</p>
+          <p class="text-[10px] text-indigo-400 tracking-widest uppercase">v1.0.0 Beta</p>
+        </div>
+      </div>
+      <div id="sidebar-profile" class="px-5 py-3 border-b border-slate-800 flex items-center gap-3"></div>
+      <nav id="sidebar-nav" class="flex-1 overflow-y-auto px-3 py-4 space-y-6"></nav>
+      <div class="px-5 py-3 border-t border-slate-800 text-[11px] text-slate-500">© 2026 Gradify<br/>Built for Academic Excellence</div>
+    </aside>
+    <div id="sidebar-backdrop" class="hidden fixed inset-0 z-20 bg-black/50 lg:hidden"></div>
+
+    <!-- Main -->
+    <main class="flex-1 lg:ml-64 min-h-screen">
+      <!-- Topbar -->
+      <header class="sticky top-0 z-10 h-16 bg-white/90 backdrop-blur border-b border-slate-200 flex items-center gap-3 px-4 lg:px-8">
+        <button id="btn-mobile-menu" class="lg:hidden p-2 rounded-lg hover:bg-slate-100">☰</button>
+        <div class="flex-1 min-w-0">
+          <h1 id="page-title" class="text-lg font-bold truncate">Dashboard</h1>
+          <p id="page-subtitle" class="text-xs text-slate-500 truncate">Selamat belajar!</p>
+        </div>
+        <select id="semester-switcher" class="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white max-w-[220px]" title="Semester Switcher"></select>
+        <div id="topbar-avatar" class="shrink-0"></div>
+      </header>
+      <div id="main-content" class="p-4 lg:p-8"></div>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container" class="fixed bottom-4 right-4 z-[60] space-y-2"></div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

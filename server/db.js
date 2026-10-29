@@ -1,0 +1,212 @@
+/**
+ * Gradify Database Layer
+ * SQLite relational database via node:sqlite (built into Node.js 22+)
+ */
+const { DatabaseSync } = require('node:sqlite');
+const path = require('node:path');
+const fs = require('node:fs');
+
+const DATA_DIR = path.join(__dirname, '..', 'data');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const db = new DatabaseSync(path.join(DATA_DIR, 'gradify.db'));
+db.exec('PRAGMA journal_mode = WAL;');
+db.exec('PRAGMA foreign_keys = ON;');
+
+/* ============================================================
+ * SCHEMA
+ * ============================================================ */
+db.exec(`
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  avatar_emoji TEXT DEFAULT '🎓',
+  npm_nim TEXT,
+  campus_name TEXT DEFAULT 'Universitas Katolik Santo Thomas (UNIKA UST)',
+  faculty TEXT,
+  study_program TEXT,
+  active_semester INTEGER DEFAULT 1,
+  target_gpa REAL DEFAULT 3.50,
+  expected_graduation_year INTEGER,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS semesters (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  semester_number INTEGER NOT NULL,
+  academic_year TEXT NOT NULL,           -- e.g. "Ganjil 2026/2027"
+  is_active INTEGER DEFAULT 0,
+  is_archived INTEGER DEFAULT 0,
+  ips REAL,                              -- Semester GPA (computed/saved)
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, semester_number)
+);
+
+CREATE TABLE IF NOT EXISTS courses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  semester_id INTEGER NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
+  course_code TEXT NOT NULL,
+  course_name TEXT NOT NULL,
+  sks INTEGER NOT NULL DEFAULT 3,
+  day TEXT,                              -- Senin..Minggu
+  start_time TEXT,                       -- HH:MM
+  end_time TEXT,                         -- HH:MM
+  room TEXT,
+  lecturer TEXT,
+  lecturer_contact TEXT,
+  grade TEXT,                            -- A, A-, B+, etc.
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  type TEXT DEFAULT 'tugas',             -- tugas | ujian | quiz | project | presentasi
+  priority TEXT DEFAULT 'sedang',        -- rendah | sedang | tinggi
+  due_date TEXT NOT NULL,                -- ISO date
+  status TEXT DEFAULT 'pending',         -- pending | done
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  content TEXT DEFAULT '',               -- Markdown with code blocks + LaTeX
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS budget_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category TEXT NOT NULL,                -- kos, makan, transport, buku, hiburan, lainnya
+  title TEXT NOT NULL,
+  amount REAL NOT NULL,
+  item_type TEXT DEFAULT 'expense',      -- expense | income
+  occurred_at TEXT DEFAULT (date('now')),
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS skripsi_milestones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  stage TEXT NOT NULL,                   -- proposal, bab1..bab5, ujian, sidang, revisi
+  status TEXT DEFAULT 'belum',           -- belum | berlangsung | selesai
+  target_date TEXT,
+  notes TEXT,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  item_type TEXT DEFAULT 'proyek',       -- proyek | prestasi | sertifikasi | organisasi | magang
+  title TEXT NOT NULL,
+  description TEXT,
+  year TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+`);
+
+/* ============================================================
+ * GRADE POINT SCALE (UNIKA UST standard 4.00 scale)
+ * ============================================================ */
+const GRADE_POINTS = {
+  'A': 4.00, 'A-': 3.75, 'B+': 3.50, 'B': 3.00, 'B-': 2.75,
+  'C+': 2.50, 'C': 2.00, 'C-': 1.75, 'D': 1.00, 'E': 0.00
+};
+
+function gradeToPoint(grade) {
+  return GRADE_POINTS[grade] ?? 0;
+}
+
+/* ============================================================
+ * UNIKA UST FACULTY & STUDY PROGRAM PRESETS (Phase 0)
+ * ============================================================ */
+const UNIKA_UST_PRESET = [
+  {
+    faculty: 'Fakultas Ilmu Komputer (FIKOM)',
+    programs: ['Teknik Informatika (S1)', 'Sistem Informasi (S1)', 'Sains Data (S1)']
+  },
+  {
+    faculty: 'Fakultas Ekonomi dan Bisnis (FEB)',
+    programs: ['Manajemen (S1)', 'Akuntansi (S1)', 'Ekonomi Pembangunan (S1)']
+  },
+  {
+    faculty: 'Fakultas Teknik (FT)',
+    programs: ['Teknik Sipil (S1)', 'Teknik Arsitektur (S1)', 'Teknik Lingkungan (S1)']
+  },
+  {
+    faculty: 'Fakultas Pertanian (FP)',
+    programs: ['Agroteknologi (S1)', 'Teknologi Hasil Pertanian (S1)', 'Agribisnis (S1)']
+  },
+  {
+    faculty: 'Fakultas Hukum (FH)',
+    programs: ['Ilmu Hukum (S1)']
+  },
+  {
+    faculty: 'Fakultas Filsafat (FF)',
+    programs: ['Ilmu Filsafat (S1)']
+  },
+  {
+    faculty: 'Fakultas Ilmu Budaya / Sastra (FIB)',
+    programs: ['Sastra Inggris (S1)', 'Sastra Indonesia (S1)']
+  },
+  {
+    faculty: 'Fakultas Keguruan dan Ilmu Pendidikan (FKIP)',
+    programs: ['Pendidikan Matematika (S1)', 'Pendidikan Bahasa Inggris (S1)', 'Pendidikam Sains (S1)']
+  }
+];
+
+/**
+ * Maximum SKS allowance rule (per PRD 1.1)
+ * IPS >= 3.00 => 24 SKS; 2.50-2.99 => 21; 2.00-2.49 => 18; < 2.00 => 15
+ */
+function maxSksForIps(ips) {
+  if (ips >= 3.0) return 24;
+  if (ips >= 2.5) return 21;
+  if (ips >= 2.0) return 18;
+  return 15;
+}
+
+/* ============================================================
+ * GPA COMPUTATION HELPERS
+ * ============================================================ */
+function computeIps(courses) {
+  // courses: [{sks, grade}]
+  let totalPoints = 0, totalSks = 0;
+  for (const c of courses) {
+    if (!c.grade || c.grade === 'Belum' || c.grade === '') continue;
+    totalPoints += gradeToPoint(c.grade) * c.sks;
+    totalSks += c.sks;
+  }
+  return totalSks > 0 ? +(totalPoints / totalSks).toFixed(2) : 0;
+}
+
+module.exports = {
+  db,
+  GRADE_POINTS,
+  UNIKA_UST_PRESET,
+  gradeToPoint,
+  maxSksForIps,
+  computeIps
+};
