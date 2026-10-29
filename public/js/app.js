@@ -73,6 +73,7 @@ const ctx = {
   api, esc, toast, rerenderMath, fmtIDR,
   navigate,
   get user() { return state.user; },
+  get currentRoute() { return state.currentRoute; },
   refresh: () => renderView()
 };
 
@@ -121,10 +122,16 @@ function renderSidebar() {
   const groups = { Akademik: [], 'Toolkit CS': [], Kehidupan: [] };
   const top = [], bottom = [];
   for (const [key, r] of Object.entries(routes)) {
-    if (!r.group) (['dashboard', 'profile', 'about'].includes(key) ? (key === 'dashboard' ? top : bottom) : groups[r.group]).push(key);
+    if (!r.group) {
+      if (key === 'dashboard') top.push(key);
+      else bottom.push(key);
+    } else if (groups[r.group]) {
+      groups[r.group].push(key);
+    }
   }
   const html = [top.map(renderNavItem).join('')]
-    .concat(Object.values(groups).map(g => g.length ? navGroup(g[0], g) : ''))
+    .concat(Object.entries(groups).map(([label, items]) => items.length ? navGroup(label, items) : ''))
+    .concat([bottom.map(renderNavItem).join('')])
     .filter(Boolean).join('');
   document.getElementById('sidebar-nav').innerHTML = html;
   document.querySelectorAll('#sidebar-nav .nav-item').forEach(a => {

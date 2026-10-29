@@ -62,10 +62,15 @@ router.get('/skripsi', (req, res) => {
   // auto-seed the template on first access
   if (milestones.length === 0) {
     const insert = db.prepare('INSERT INTO skripsi_milestones (user_id, title, stage, sort_order) VALUES (?, ?, ?, ?)');
-    const tx = db.transaction(() => {
+    // node:sqlite has no better-sqlite3 style transaction helper; use manual BEGIN/COMMIT
+    db.exec('BEGIN');
+    try {
       for (const m of SKRIPSI_TEMPLATE) insert.run(req.user.id, m.title, m.stage, m.sort_order);
-    });
-    tx();
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
     milestones = db.prepare('SELECT * FROM skripsi_milestones WHERE user_id = ? ORDER BY sort_order').all(req.user.id);
   }
   const done = milestones.filter(m => m.status === 'selesai').length;
