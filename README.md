@@ -178,7 +178,7 @@ Endpoint API yang memerlukan autentikasi menggunakan token sesi yang dikembalika
 - **Lead Developer:** Student Developer Team
 - **Program Studi:** Teknik Informatika, Fakultas Ilmu Komputer
 - **Institusi:** Universitas Katolik Santo Thomas (UNIKA UST), Medan
-- **Email:** `support@gradify.ac.id`
+- **Email:** `claretianovfx@gmail.com`
 
 ## Lisensi
 
