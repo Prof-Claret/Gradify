@@ -99,10 +99,16 @@ export async function render(main, ctx) {
     main.querySelectorAll('.n-item').forEach(it =>
       it.classList.toggle('border-indigo-400', String(it.dataset.id) === String(id)));
     mountEditor(note);
+    if (window.innerWidth < 1024) {
+      document.getElementById('editor-panel')?.scrollIntoView({ behavior: 'smooth' });
+    }
   }
 
   function newNote() {
     mountEditor({ id: null, title: '', content: '', course_id: null });
+    if (window.innerWidth < 1024) {
+      document.getElementById('editor-panel')?.scrollIntoView({ behavior: 'smooth' });
+    }
   }
 
   function mountEditor(note) {
@@ -113,12 +119,12 @@ export async function render(main, ctx) {
     panel.innerHTML = `
     <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
       <!-- toolbar -->
-      <div class="border-b border-slate-200 p-3 flex flex-wrap gap-1.5 items-center bg-slate-50">
-        <span class="text-[10px] font-bold text-slate-400 mr-1 uppercase tracking-wider">Snippet:</span>
-        ${SNIPPETS.map((s, i) => `<button class="snip-btn" data-i="${i}" title="Sisipkan ${esc(s.label)}">${esc(s.label)}</button>`).join('')}
+      <div class="border-b border-slate-200 p-2.5 sm:p-3 flex gap-1.5 items-center bg-slate-50 overflow-x-auto no-scrollbar">
+        <span class="text-[10px] font-bold text-slate-400 mr-1 uppercase tracking-wider shrink-0">Snippet:</span>
+        ${SNIPPETS.map((s, i) => `<button class="snip-btn shrink-0" data-i="${i}" title="Sisipkan ${esc(s.label)}">${esc(s.label)}</button>`).join('')}
       </div>
       <!-- title + course -->
-      <div class="p-4 pb-0 grid md:grid-cols-[2fr_1fr] gap-3">
+      <div class="p-3 sm:p-4 pb-0 grid md:grid-cols-[2fr_1fr] gap-3">
         <div>
           <label class="text-[10px] font-bold text-slate-400 uppercase">Judul</label>
           <input id="n-title" value="${esc(note.title)}" class="g-inp" placeholder="cth. Menghapus instalasi — ADT Stack" />
@@ -133,20 +139,20 @@ export async function render(main, ctx) {
       </div>
       <!-- editor + preview -->
       <div class="grid md:grid-cols-2 gap-0 mt-3">
-        <div class="p-4 border-b md:border-b-0 md:border-r border-slate-200">
-          <textarea id="n-content" class="w-full h-[480px] font-mono text-[13px] leading-relaxed text-slate-700 outline-none resize-none" placeholder="Tulis catatan di sini. Gunakan \`\`\`python untuk blok kode, $x^2$ untuk LaTeX.">${esc(note.content)}</textarea>
+        <div class="p-3 sm:p-4 border-b md:border-b-0 md:border-r border-slate-200">
+          <textarea id="n-content" class="w-full h-[320px] sm:h-[480px] font-mono text-[13px] leading-relaxed text-slate-700 outline-none resize-none" placeholder="Tulis catatan di sini. Gunakan \`\`\`python untuk blok kode, $x^2$ untuk LaTeX.">${esc(note.content)}</textarea>
         </div>
-        <div class="p-4 bg-slate-50 overflow-y-auto h-[480px]">
+        <div class="p-3 sm:p-4 bg-slate-50 overflow-y-auto h-[320px] sm:h-[480px]">
           <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">👁️ Preview</p>
           <div id="n-preview" class="note-content text-sm text-slate-700"></div>
           <p class="text-[10px] text-slate-400 mt-4 italic">Snippet disalin via tombol di toolbar.</p>
         </div>
       </div>
-      <div class="p-4 border-t border-slate-200 flex justify-between items-center">
+      <div class="p-3 sm:p-4 border-t border-slate-200 flex flex-wrap gap-2 justify-between items-center">
         <span class="text-[11px] text-slate-400" id="n-meta"></span>
-        <div class="flex gap-2">
-          <button id="n-copy-all" class="text-xs px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-semibold">📋 Salin Semua</button>
-          <button id="n-save" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2 rounded-xl text-sm">💾 Simpan</button>
+        <div class="flex gap-2 w-full sm:w-auto justify-end">
+          <button id="n-copy-all" class="text-xs px-3 sm:px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-semibold">📋 Salin</button>
+          <button id="n-save" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 sm:px-6 py-2 rounded-xl text-xs sm:text-sm">💾 Simpan</button>
         </div>
       </div>
     </div>`;

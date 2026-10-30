@@ -927,8 +927,8 @@ export async function render(mainEl, ctx, extra) {
     <p class="text-slate-500 text-sm mt-1 max-w-3xl">Empat laboratorium spesialis untuk mahasiswa Informatika/SI — mini SQL engine di memori, tester regex lengkap dengan automata NFA→DFA, kalkulator subnet/CIDR bitwise, dan referensi kompleksitas Big-O. Semua berjalan <b>100% di browser</b>, tanpa server.</p>
   </div>
 
-  <div class="flex flex-wrap gap-2" id="dt-tabs">
-    ${tabsDef.map(t => `<button data-tab="${t.id}" class="text-sm px-4 py-2 rounded-xl transition ${t.id === 'sql' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}">${t.icon} ${t.label}</button>`).join('')}
+  <div class="flex overflow-x-auto no-scrollbar py-1 gap-2 flex-nowrap sm:flex-wrap" id="dt-tabs">
+    ${tabsDef.map(t => `<button data-tab="${t.id}" class="text-xs sm:text-sm px-3.5 sm:px-4 py-2 rounded-xl transition shrink-0 ${t.id === 'sql' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}">${t.icon} ${t.label}</button>`).join('')}
   </div>
 
   <!-- ============ TAB 1: SQL ============ -->

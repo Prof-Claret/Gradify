@@ -35,14 +35,14 @@ export async function render(main, ctx) {
     const totalSks = courses.reduce((a, c) => a + c.sks, 0);
     main.innerHTML = `
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-      <div class="flex items-center gap-2">
-        <select id="sem-pick" class="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white">
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+        <select id="sem-pick" class="flex-1 sm:flex-none text-xs sm:text-sm border border-slate-300 rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 bg-white">
           ${semesters.map(s => `<option value="${s.id}" ${semesterRow && s.id === semesterRow.id ? 'selected' : ''}>
             Semester ${s.semester_number} — ${esc(s.academic_year)}${s.is_active ? ' (Aktif)' : ''}</option>`).join('')}
         </select>
-        <span class="text-xs bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-full">${courses.length} Matkul · ${totalSks} SKS</span>
+        <span class="text-xs bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-full shrink-0">${courses.length} Matkul · ${totalSks} SKS</span>
       </div>
-      <button id="add-course" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-xl">+ Tambah Matkul</button>
+      <button id="add-course" class="w-full sm:w-auto text-center bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold px-4 py-2 rounded-xl">+ Tambah Matkul</button>
     </div>
 
     ${courses.length === 0 ? `
@@ -77,8 +77,8 @@ export async function render(main, ctx) {
     </div>`}
 
     <!-- Modal form -->
-    <div id="course-modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-start justify-center overflow-y-auto p-4">
-      <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl my-8" id="course-modal-body"></div>
+    <div id="course-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-start justify-center overflow-y-auto p-2 sm:p-4">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl my-3 sm:my-8 max-h-[92vh] overflow-y-auto" id="course-modal-body"></div>
     </div>`;
 
     bindTimetable(courses);
@@ -151,10 +151,10 @@ export async function render(main, ctx) {
     const body = document.getElementById('course-modal-body');
     modal.classList.remove('hidden');
     body.innerHTML = `
-      <div class="p-6">
+      <div class="p-4 sm:p-6">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="font-bold text-slate-800">${course ? '✏️ Ubah Matkul' : '➕ Tambah Mata Kuliah'}</h3>
-          <button id="cm-close" class="text-slate-400 hover:text-slate-700 text-xl">✕</button>
+          <h3 class="font-bold text-slate-800 text-base sm:text-lg">${course ? '✏️ Ubah Matkul' : '➕ Tambah Mata Kuliah'}</h3>
+          <button id="cm-close" class="text-slate-400 hover:text-slate-700 text-xl p-1">✕</button>
         </div>
         <form id="cm-form" class="grid md:grid-cols-2 gap-3">
           <div>

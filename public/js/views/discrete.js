@@ -1704,7 +1704,7 @@ export async function render(mainEl, ctx, extra) {
       <h2 class="text-2xl font-extrabold text-slate-800">🧮 Matematika Diskrit Hub</h2>
       <p class="text-sm text-slate-500 mt-1">Delapan alat interaktif: logika, himpunan, relasi &amp; fungsi, aljabar Boolean, kombinatorika, graf, teori bilangan, serta induksi &amp; rekurensi — semua dihitung lokal di peramban.</p>
     </div>
-    <div id="dis-tabbar" class="flex flex-wrap gap-2"></div>
+    <div id="dis-tabbar" class="flex overflow-x-auto no-scrollbar py-1 gap-2 flex-nowrap sm:flex-wrap"></div>
     <div id="dis-tabcontent" class="mt-5"></div>`;
 
   const bar = mainEl.querySelector('#dis-tabbar');
@@ -1714,7 +1714,7 @@ export async function render(mainEl, ctx, extra) {
   function drawBar() {
     bar.innerHTML = TABS.map((t) => {
       const active = t.id === currentTab;
-      return `<button type="button" data-tab="${t.id}" class="px-3.5 py-2 rounded-xl text-sm font-semibold transition ${active ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}">${t.icon} ${t.label}</button>`;
+      return `<button type="button" data-tab="${t.id}" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shrink-0 ${active ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}">${t.icon} ${t.label}</button>`;
     }).join('');
   }
 

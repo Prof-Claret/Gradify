@@ -1,4 +1,10 @@
-/* Gradify custom styles */
+/* Gradify custom styles & responsive mobile design */
+
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* Code inside notes / calculators */
 pre code, code.mono {
@@ -10,6 +16,7 @@ pre code {
   padding: 1rem;
   overflow-x: auto;
   font-size: 0.85rem;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Note content typography */
@@ -19,7 +26,7 @@ pre code {
 .note-content ul { list-style: disc; padding-left: 1.4rem; margin: 0.4rem 0; }
 .note-content ol { list-style: decimal; padding-left: 1.4rem; margin: 0.4rem 0; }
 .note-content blockquote { border-left: 4px solid #6366f1; padding-left: 0.8rem; color: #475569; margin: 0.6rem 0; }
-.note-content table { border-collapse: collapse; margin: 0.8rem 0; }
+.note-content table { border-collapse: collapse; margin: 0.8rem 0; width: 100%; }
 .note-content th, .note-content td { border: 1px solid #cbd5e1; padding: 0.3rem 0.6rem; }
 
 /* Greek symbol palette buttons */
@@ -79,6 +86,96 @@ pre code {
 .nav-item.active { background: #4f46e5; color: #fff; font-weight: 600; }
 .nav-label { font-size: 0.65rem; letter-spacing: .12em; text-transform: uppercase; color: #64748b; padding: 0 0.75rem; }
 
-/* scrollbar */
-::-webkit-scrollbar { width: 8px; height: 8px; }
+/* Global Forms */
+.g-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  display: block;
+  margin-bottom: 4px;
+}
+.g-inp {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.875rem;
+  outline: none;
+  background: #ffffff;
+  color: #1e293b;
+  transition: border-color .15s, box-shadow .15s;
+}
+.g-inp:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px #e0e7ff;
+}
+
+/* Utilities for mobile smoothness */
+.overflow-x-auto, .overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbar for tab bars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* iOS Safe Areas */
+.safe-bottom {
+  padding-bottom: max(0.6rem, env(safe-area-inset-bottom, 0.6rem));
+}
+.safe-top {
+  padding-top: max(0rem, env(safe-area-inset-top, 0rem));
+}
+
+/* Standard scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ============================================================
+ * MOBILE MEDIA QUERIES (screens < 640px)
+ * ============================================================ */
+@media (max-width: 640px) {
+  /* Prevent iOS Safari auto-zoom on form inputs */
+  input, select, textarea, .g-inp {
+    font-size: 16px !important;
+  }
+
+  /* Compact tables on small screens */
+  .gtable {
+    font-size: 0.75rem;
+  }
+  .gtable th, .gtable td {
+    padding: 0.35rem 0.45rem;
+  }
+
+  /* Compact matrix on mobile */
+  .matrix-input {
+    width: 2.6rem;
+    padding: 0.25rem 0.1rem;
+    font-size: 0.8rem;
+  }
+
+  /* Compact greek symbol buttons */
+  .greek-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 0.95rem;
+  }
+
+  /* Calculator display */
+  .calc-display {
+    font-size: 1.15rem;
+  }
+
+  /* Adjust step box */
+  .step-box {
+    padding: 0.5rem 0.7rem;
+    font-size: 0.8rem;
+  }
+}

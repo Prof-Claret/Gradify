@@ -74,9 +74,13 @@ export function navigate(route, subTab) {
   state.currentRoute = route;
   window.location.hash = subTab ? `${route}/${subTab}` : route;
   if (subTab) sessionStorage.setItem('gradify_tab', subTab);
+  const base = String(state.currentRoute).split('/')[0];
+  const titleEl = document.getElementById('page-title');
+  if (titleEl) titleEl.textContent = (routes[base] || routes.dashboard).label;
   renderView();
   refreshSidebarActive();
   closeMobileSidebar();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* ---------- view rendering ---------- */
@@ -146,7 +150,11 @@ function renderSidebar() {
     .filter(Boolean).join('');
   document.getElementById('sidebar-nav').innerHTML = html;
   document.querySelectorAll('#sidebar-nav .nav-item').forEach(a => {
-    a.addEventListener('click', (e) => { e.preventDefault(); navigate(a.dataset.route); });
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeMobileSidebar();
+      navigate(a.dataset.route);
+    });
   });
   refreshSidebarActive();
 }
@@ -155,6 +163,12 @@ function refreshSidebarActive() {
   const activeBase = String(state.currentRoute || 'dashboard').split('/')[0];
   document.querySelectorAll('#sidebar-nav .nav-item').forEach(a => {
     a.classList.toggle('active', a.dataset.route === activeBase);
+  });
+  document.querySelectorAll('#mobile-bottom-nav .bnav-btn').forEach(b => {
+    const isActive = b.dataset.route === activeBase;
+    b.classList.toggle('text-indigo-600', isActive);
+    b.classList.toggle('font-bold', isActive);
+    b.classList.toggle('text-slate-500', !isActive);
   });
 }
 
@@ -253,8 +267,16 @@ function showAuth() {
 }
 
 /* ---------- boot ---------- */
-document.getElementById('btn-mobile-menu').addEventListener('click', openMobileSidebar);
-document.getElementById('sidebar-backdrop').addEventListener('click', closeMobileSidebar);
+document.getElementById('btn-mobile-menu')?.addEventListener('click', openMobileSidebar);
+document.getElementById('btn-sidebar-close')?.addEventListener('click', closeMobileSidebar);
+document.getElementById('sidebar-backdrop')?.addEventListener('click', closeMobileSidebar);
+document.getElementById('bnav-menu-btn')?.addEventListener('click', openMobileSidebar);
+document.querySelectorAll('#mobile-bottom-nav .bnav-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    navigate(btn.dataset.route);
+  });
+});
 
 window.addEventListener('hashchange', () => {
   const prev = state.currentRoute;

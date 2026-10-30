@@ -935,8 +935,8 @@ export async function render(main, ctx, extra) {
   /* ================= SHELL TAB ================= */
   function draw() {
     main.innerHTML = `
-    <div id="tk-tabs" class="flex flex-wrap gap-2 mb-5">${TABS.map(t =>
-      `<button data-tab="${t.id}" class="px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors border ${t.id === activeTab ? TAB_ON : TAB_OFF}">${t.label}</button>`).join('')}</div>
+    <div id="tk-tabs" class="flex overflow-x-auto no-scrollbar py-1 gap-2 flex-nowrap sm:flex-wrap mb-5">${TABS.map(t =>
+      `<button data-tab="${t.id}" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors border shrink-0 ${t.id === activeTab ? TAB_ON : TAB_OFF}">${t.label}</button>`).join('')}</div>
     <div id="tk-body"></div>`;
     main.querySelectorAll('#tk-tabs [data-tab]').forEach(btn => btn.addEventListener('click', () => {
       if (btn.dataset.tab === activeTab) return;
@@ -948,7 +948,7 @@ export async function render(main, ctx, extra) {
   }
   function paintTabs() {
     main.querySelectorAll('#tk-tabs [data-tab]').forEach(btn => {
-      btn.className = `px-3.5 py-2 rounded-xl text-sm font-semibold transition-colors border ${btn.dataset.tab === activeTab ? TAB_ON : TAB_OFF}`;
+      btn.className = `px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors border shrink-0 ${btn.dataset.tab === activeTab ? TAB_ON : TAB_OFF}`;
     });
   }
   function drawTab() {

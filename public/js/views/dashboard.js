@@ -32,22 +32,22 @@ export async function render(main, ctx) {
 
   main.innerHTML = `
   <!-- Hero greeting -->
-  <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 rounded-2xl p-6 text-white mb-6 shadow-lg">
+  <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 rounded-2xl p-4 sm:p-6 text-white mb-6 shadow-lg">
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <p class="text-indigo-200 text-sm">${esc(todayName)}, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-        <h2 class="text-2xl font-extrabold mt-1">Halo, ${esc(ctx.user.full_name.split(' ')[0])}! 👋</h2>
-        <p class="text-indigo-100 text-sm mt-1">${esc(ctx.user.faculty || '')} · Semester ${ctx.user.active_semester} · Target IPK ${target_gpa}</p>
+        <p class="text-indigo-200 text-xs sm:text-sm">${esc(todayName)}, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+        <h2 class="text-xl sm:text-2xl font-extrabold mt-1">Halo, ${esc(ctx.user.full_name.split(' ')[0])}! 👋</h2>
+        <p class="text-indigo-100 text-xs sm:text-sm mt-1">${esc(ctx.user.faculty || '')} · Semester ${ctx.user.active_semester} · Target IPK ${target_gpa}</p>
       </div>
-      <div class="flex gap-2">
-        <button id="q-add-task" class="bg-white/15 hover:bg-white/25 backdrop-blur px-4 py-2 rounded-xl text-sm font-semibold">+ Tugas Baru</button>
-        <button id="q-check-promote" class="bg-white text-indigo-700 px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-50 transition">Naik Semester →</button>
+      <div class="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
+        <button id="q-add-task" class="flex-1 sm:flex-none text-center bg-white/15 hover:bg-white/25 backdrop-blur px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition">+ Tugas Baru</button>
+        <button id="q-check-promote" class="flex-1 sm:flex-none text-center bg-white text-indigo-700 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold hover:bg-indigo-50 transition">Naik Semester →</button>
       </div>
     </div>
   </div>
 
   <!-- Stat cards -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" id="stat-cards">
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" id="stat-cards">
     ${statCard('IPK Kumulatif', summary.ipk.toFixed(2) || '-', `Predikat: ${summary.predikat}`, '🎯', summary.ipk >= (target_gpa - 0.3) ? 'text-emerald-600' : 'text-rose-600')}
     ${statCard('Sudah Dinilai', `${summary.total_sks_graded} SKS`, `Take: ${summary.total_sks_taken} SKS`, '📋', 'text-indigo-600')}
     ${statCard('Maks SKS Berikutnya', `${summary.max_sks_next} SKS`, 'Sesuai regulasi IPS', '⚖️', 'text-indigo-600')}
@@ -56,39 +56,39 @@ export async function render(main, ctx) {
 
   <div class="grid lg:grid-cols-3 gap-6 mb-6">
     <!-- Today agenda -->
-    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="font-bold text-slate-800">📅 Jadwal Hari Ini — ${esc(todayName)}</h3>
+        <h3 class="font-bold text-slate-800 text-sm sm:text-base">📅 Jadwal Hari Ini — ${esc(todayName)}</h3>
         <button id="goto-courses" class="text-xs text-indigo-600 font-medium hover:underline">Kelola Matkul →</button>
       </div>
       ${todayClass.length === 0 ? emptyState('🕊️', 'Tidak ada kelas hari ini', 'Fokus tugas atau istirahat!')
       : `<div class="space-y-2">${todayClass.map(c => `
         <div class="flex items-center gap-3 border border-slate-200 rounded-xl p-3 hover:border-indigo-300 transition">
-          <div class="bg-indigo-50 text-indigo-700 rounded-lg px-3 py-2 text-center min-w-[90px]">
-            <p class="font-mono font-bold text-sm">${esc(c.start_time || '--:--')}</p>
-            <p class="font-mono text-[10px]">${esc(c.end_time || '')}</p>
+          <div class="bg-indigo-50 text-indigo-700 rounded-lg px-2.5 py-1.5 sm:px-3 sm:py-2 text-center min-w-[75px] sm:min-w-[90px] shrink-0">
+            <p class="font-mono font-bold text-xs sm:text-sm">${esc(c.start_time || '--:--')}</p>
+            <p class="font-mono text-[9px] sm:text-[10px] text-indigo-500">${esc(c.end_time || '')}</p>
           </div>
           <div class="flex-1 min-w-0">
-            <p class="font-semibold text-sm text-slate-800 truncate">${esc(c.course_name)}</p>
-            <p class="text-xs text-slate-500">${esc(c.room || '—')} · ${esc(c.lecturer || '—')} · ${c.sks} SKS</p>
+            <p class="font-semibold text-xs sm:text-sm text-slate-800 truncate">${esc(c.course_name)}</p>
+            <p class="text-[11px] sm:text-xs text-slate-500 truncate">${esc(c.room || '—')} · ${esc(c.lecturer || '—')} · ${c.sks} SKS</p>
           </div>
-          <span class="text-[10px] bg-slate-100 rounded-full px-2 py-1 font-mono">${esc(c.course_code)}</span>
+          <span class="text-[10px] bg-slate-100 rounded-full px-2 py-1 font-mono shrink-0 hidden sm:inline-block">${esc(c.course_code)}</span>
         </div>`).join('')}</div>`}
     </div>
 
     <!-- Deadline countdown -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-      <h3 class="font-bold text-slate-800 mb-3">⏳ Deadline Terdekat</h3>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
+      <h3 class="font-bold text-slate-800 text-sm sm:text-base mb-3">⏳ Deadline Terdekat</h3>
       ${pending.length === 0 ? emptyState('🎉', 'Semua tugas bersih!', 'Tidak ada deadline terdekat.') :
       `<div class="space-y-2">${pending.map(t => {
         const daysLeft = Math.ceil((new Date(t.due_date) - new Date()) / 86400000);
         const urgent = daysLeft <= 1, soon = daysLeft <= 3;
         return `<div class="flex items-center gap-2.5 border ${urgent ? 'border-rose-300 bg-rose-50' : 'border-slate-200'} rounded-xl p-2.5">
           <div class="min-w-0 flex-1">
-            <p class="text-sm font-medium text-slate-800 truncate">${esc(t.title)}</p>
-            <p class="text-[11px] text-slate-500">${esc(t.course_name || '')} · ${new Date(t.due_date).toLocaleDateString('id-ID')}</p>
+            <p class="text-xs sm:text-sm font-medium text-slate-800 truncate">${esc(t.title)}</p>
+            <p class="text-[10px] sm:text-[11px] text-slate-500 truncate">${esc(t.course_name || '')} · ${new Date(t.due_date).toLocaleDateString('id-ID')}</p>
           </div>
-          <span class="text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${urgent ? 'bg-rose-600 text-white' : soon ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-700'}">
+          <span class="text-[9px] sm:text-[10px] font-bold px-2 py-0.5 sm:py-1 rounded-full shrink-0 ${urgent ? 'bg-rose-600 text-white' : soon ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-700'}">
             ${daysLeft === 0 ? 'HARI INI' : daysLeft < 0 ? 'LEWAT' : `${daysLeft} hari`}</span>
           <button class="t-done shrink-0 w-6 h-6 rounded-full border-2 border-indigo-300 hover:bg-indigo-500 text-transparent hover:text-white text-xs" data-id="${t.id}" title="Selesaikan">✓</button>
         </div>`;
@@ -98,18 +98,18 @@ export async function render(main, ctx) {
   </div>
 
   <!-- Quick add task -->
-  <div id="quick-task" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-6"></div>
+  <div id="quick-task" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 mb-6"></div>
 
   <!-- Full task list -->
-  <section id="task-section" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+  <section id="task-section" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h3 class="font-bold text-slate-800">📋 Semua Tugas</h3>
-      <div class="flex gap-1" id="task-filters">
-        <button data-f="all" class="f-btn bg-indigo-600 text-white">Semua</button>
-        <button data-f="tugas" class="f-btn bg-slate-200">Tugas</button>
-        <button data-f="ujian" class="f-btn bg-slate-200">Ujian</button>
-        <button data-f="quiz" class="f-btn bg-slate-200">Quiz</button>
-        <button data-f="project" class="f-btn bg-slate-200">Project</button>
+      <h3 class="font-bold text-slate-800 text-sm sm:text-base">📋 Semua Tugas</h3>
+      <div class="flex gap-1.5 overflow-x-auto no-scrollbar py-1 max-w-full" id="task-filters">
+        <button data-f="all" class="f-btn bg-indigo-600 text-white shrink-0">Semua</button>
+        <button data-f="tugas" class="f-btn bg-slate-200 shrink-0">Tugas</button>
+        <button data-f="ujian" class="f-btn bg-slate-200 shrink-0">Ujian</button>
+        <button data-f="quiz" class="f-btn bg-slate-200 shrink-0">Quiz</button>
+        <button data-f="project" class="f-btn bg-slate-200 shrink-0">Project</button>
       </div>
     </div>
     <div id="task-list" class="space-y-2"></div>
@@ -120,9 +120,12 @@ export async function render(main, ctx) {
   wireEvents(api, toast, navigate, ctx);
 
   function statCard(label, value, sub, icon, valCls) {
-    return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
-      <div class="flex items-center gap-2 mb-2"><span>${icon}</span><p class="text-xs text-slate-500 font-medium">${esc(label)}</p></div>
-      <p class="text-2xl font-extrabold ${valCls}">${esc(value)}</p>
+    return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 sm:p-4">
+      <div class="flex items-center gap-1.5 mb-1.5"><span class="text-base">${icon}</span><p class="text-[11px] sm:text-xs text-slate-500 font-medium truncate">${esc(label)}</p></div>
+      <p class="text-lg sm:text-2xl font-extrabold ${valCls} truncate">${esc(value)}</p>
+      <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">${esc(sub)}</p>
+    </div>`;
+  }
       <p class="text-[11px] text-slate-400 mt-1">${esc(sub)}</p>
     </div>`;
   }

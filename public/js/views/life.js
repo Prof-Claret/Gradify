@@ -61,7 +61,7 @@ export async function render(main, ctx, extra) {
   const active = ['budget', 'skripsi', 'portfolio'].includes(base) ? base : 'budget';
 
   const pill = (key, icon, label) => `
-    <button data-life="${key}" class="text-xs font-semibold px-3.5 py-1.5 rounded-lg transition
+    <button data-life="${key}" class="text-xs font-semibold px-3 py-1.5 rounded-lg transition shrink-0
       ${active === key ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}">
       ${icon} ${label}</button>`;
 
@@ -71,7 +71,7 @@ export async function render(main, ctx, extra) {
       <h3 class="font-bold text-slate-800">🌱 Kehidupan Mahasiswa</h3>
       <p class="text-xs text-slate-500">Phase 3 & 4 · Budget Kos · Skripsi Tracker · Portfolio & CV</p>
     </div>
-    <div class="bg-white p-1 rounded-xl border border-slate-200 shadow-sm flex gap-0.5">
+    <div class="bg-white p-1 rounded-xl border border-slate-200 shadow-sm flex overflow-x-auto no-scrollbar gap-0.5 w-full sm:w-auto">
       ${pill('budget', '💰', 'Budget Kos')}
       ${pill('skripsi', '📗', 'Skripsi')}
       ${pill('portfolio', '🏅', 'Portofolio & CV')}

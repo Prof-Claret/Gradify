@@ -12,14 +12,14 @@ export function render(box, ctx) {
   /* ================= LOGIN VIEW ================= */
   function renderLogin(backdrop) {
     box.innerHTML = `
-    <div class="${backdrop ? '' : 'min-h-[92vh]'} flex items-center py-8">
+    <div class="${backdrop ? '' : 'min-h-[92vh]'} flex items-center py-4 sm:py-8 px-2 sm:px-0">
       <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden mx-auto">
-        <div class="bg-gradient-to-r from-indigo-700 to-violet-700 text-white p-8 text-center">
-          <div class="text-5xl mb-2">🎓</div>
+        <div class="bg-gradient-to-r from-indigo-700 to-violet-700 text-white p-6 sm:p-8 text-center">
+          <div class="text-4xl sm:text-5xl mb-2">🎓</div>
           <h1 class="text-2xl font-extrabold">Gradify</h1>
-          <p class="text-indigo-200 text-sm italic mt-1">Simplify Your Academic Journey</p>
+          <p class="text-indigo-200 text-xs sm:text-sm italic mt-1">Simplify Your Academic Journey</p>
         </div>
-        <div class="p-8 space-y-4">
+        <div class="p-5 sm:p-8 space-y-4">
           <div>
             <h2 class="text-lg font-bold text-slate-800">Masuk ke akunmu</h2>
             <p class="text-sm text-slate-500">Selamat datang kembali, mahasiswa hebat!</p>
@@ -61,16 +61,16 @@ export function render(box, ctx) {
   /* ================= REGISTRATION WIZARD ================= */
   async function renderWizard() {
     box.innerHTML = `
-    <div class="min-h-[92vh] flex items-center justify-center py-8">
+    <div class="min-h-[92vh] flex items-center justify-center py-4 sm:py-8 px-2 sm:px-0">
       <div class="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden">
-        <div class="bg-slate-900 text-white p-6">
-          <button id="wiz-back" class="text-xs text-slate-400 hover:text-white mb-3 hidden">← Kembali ke Login</button>
-          <h2 class="text-xl font-extrabold">Registrasi Mahasiswa</h2>
-          <p class="text-slate-400 text-sm mt-0.5">Lengkapi 3 langkah di bawah untuk membuat akunmu.</p>
+        <div class="bg-slate-900 text-white p-4 sm:p-6">
+          <button id="wiz-back" class="text-xs text-slate-400 hover:text-white mb-2 sm:mb-3 hidden">← Kembali ke Login</button>
+          <h2 class="text-lg sm:text-xl font-extrabold">Registrasi Mahasiswa</h2>
+          <p class="text-slate-400 text-xs sm:text-sm mt-0.5">Lengkapi 3 langkah di bawah untuk membuat akunmu.</p>
           <!-- progress steps -->
-          <div class="flex gap-2 mt-4" id="wiz-progress"></div>
+          <div class="flex gap-1.5 sm:gap-2 mt-4" id="wiz-progress"></div>
         </div>
-        <div class="p-6 md:p-8" id="wiz-body"></div>
+        <div class="p-4 sm:p-8" id="wiz-body"></div>
       </div>
     </div>`;
     box.querySelector('#wiz-back').classList.remove('hidden');
@@ -81,11 +81,11 @@ export function render(box, ctx) {
         const s = i + 1;
         const done = wizard.step > s, active = wizard.step === s;
         const cls = done ? 'bg-emerald-500 text-white' : active ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-400';
-        return `<div class="flex items-center gap-1.5 flex-1 ${i < steps_meta.length - 1 ? 'pr-2' : ''}">
-          <div class="${cls} w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0">${done ? '✓' : s}</div>
-          <span class="text-${active ? 'white' : 'slate-500'} text-xs font-medium">${label}</span>
+        return `<div class="flex items-center gap-1 sm:gap-1.5 flex-1 min-w-0 ${i < steps_meta.length - 1 ? 'pr-1 sm:pr-2' : ''}">
+          <div class="${cls} w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold shrink-0">${done ? '✓' : s}</div>
+          <span class="text-${active ? 'white' : 'slate-500'} text-[11px] sm:text-xs font-medium truncate">${label}</span>
         </div>`;
-      }).join('<div class="flex-1 h-px bg-slate-700 self-center"></div>');
+      }).join('<div class="flex-1 h-px bg-slate-700 self-center hidden sm:block"></div>');
     }
 
     box.querySelector('#wiz-back').addEventListener('click', () => { mode = 'login'; renderLogin(false); });
