@@ -1687,7 +1687,7 @@ const RENDERERS = {
   induk: tabInduksi,
 };
 
-async function render(mainEl, ctx, extra) {
+export async function render(mainEl, ctx, extra) {
   const S = {
     logika: { nvars: 2, expr: '¬(p∧q) → (p∨q)', eqa: '¬(p∧q)', eqb: '¬p∨¬q' },
     himp: { a: '1, 2, 3', b: '2, 3, 5', venn: 'union' },
@@ -1741,4 +1741,4 @@ async function render(mainEl, ctx, extra) {
   renderTab();
 }
 
-export default { render };
+export default { render, subtitle };

@@ -907,7 +907,7 @@ function binSpans(v, prefix) {
 /* ============================================================
    VIEW
    ============================================================ */
-export default async function render(mainEl, ctx, extra) {
+export async function render(mainEl, ctx, extra) {
   const esc = ctx.esc;
   const qs = sel => mainEl.querySelector(sel);
   const qsa = sel => mainEl.querySelectorAll(sel);
@@ -1477,3 +1477,5 @@ abd ababab</textarea>
   }
   if (ctx.rerenderMath) await ctx.rerenderMath();
 }
+
+export default { render, subtitle };

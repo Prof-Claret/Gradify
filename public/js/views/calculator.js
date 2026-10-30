@@ -5,8 +5,6 @@
 
 export const subtitle = () => 'Kalkulator ilmiah & rujukan simbol Yunani';
 
-export default { render, subtitle };
-
 /* ============================================================
  * DATA RUJUKAN
  * ============================================================ */
@@ -149,7 +147,7 @@ function fmtNum(x) {
 /* ============================================================
  * RENDER
  * ============================================================ */
-async function render(main, ctx) {
+export async function render(main, ctx) {
   const esc = ctx.esc;
   const toast = ctx.toast;
 
@@ -602,3 +600,5 @@ async function render(main, ctx) {
   renderHistory();
   ctx.rerenderMath(); // MathJax untuk legenda & kartu rumus ($...$)
 }
+
+export default { render, subtitle };
