@@ -4,6 +4,13 @@
 const express = require('express');
 const crypto = require('node:crypto');
 const { db, UNIKA_UST_PRESET } = require('../db');
+const {
+  checkAvatarRateLimit,
+  handleAvatarUploadMiddleware,
+  processAndSanitizeAvatar,
+  deleteOldAvatarFile,
+  serveAvatarFile
+} = require('../utils/avatarSecurity');
 
 const router = express.Router();
 
@@ -226,6 +233,67 @@ router.put('/password', requireAuth, (req, res) => {
   const newHash = hashPassword(new_password, salt);
   db.prepare('UPDATE users SET password_hash = ?, salt = ? WHERE id = ?').run(newHash, salt, req.user.id);
   res.json({ ok: true, message: 'Password berhasil diubah.' });
+});
+
+/* ---------- GET /api/auth/avatar/:filename: Securely serve user avatar ---------- */
+router.get('/avatar/:filename', (req, res) => {
+  serveAvatarFile(req.params.filename, req, res);
+});
+
+/* ---------- POST /api/auth/avatar: Secure avatar upload & re-encoding ---------- */
+router.post('/avatar', requireAuth, (req, res) => {
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+  const rateLimitKey = `${req.user.id}:${ip}`;
+  if (!checkAvatarRateLimit(rateLimitKey)) {
+    return res.status(429).json({ error: 'Terlalu banyak permintaan upload foto. Silakan coba 5 menit lagi.' });
+  }
+
+  handleAvatarUploadMiddleware(req, res, async () => {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ error: 'Tidak ada file foto yang dipilih.' });
+      }
+
+      // Re-encode, sanitize, and strip metadata
+      const { filename, avatarUrl } = await processAndSanitizeAvatar(req.file.buffer, req.user.id);
+
+      // Clean up previous custom avatar file if present
+      deleteOldAvatarFile(req.user.avatar_url, req.user.id);
+
+      // Save new avatar URL to user record
+      db.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').run(avatarUrl, req.user.id);
+
+      const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+      res.json({
+        ok: true,
+        avatar_url: avatarUrl,
+        user: publicUser(updatedUser),
+        message: 'Foto profil berhasil diperbarui!'
+      });
+    } catch (err) {
+      console.error('[Avatar Upload Error]', err.message);
+      res.status(400).json({ error: err.message || 'Gagal memproses foto profil.' });
+    }
+  });
+});
+
+/* ---------- DELETE /api/auth/avatar: Delete avatar and revert to emoji ---------- */
+router.delete('/avatar', requireAuth, (req, res) => {
+  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+  const rateLimitKey = `${req.user.id}:${ip}`;
+  if (!checkAvatarRateLimit(rateLimitKey)) {
+    return res.status(429).json({ error: 'Terlalu banyak permintaan. Silakan coba 5 menit lagi.' });
+  }
+
+  deleteOldAvatarFile(req.user.avatar_url, req.user.id);
+  db.prepare('UPDATE users SET avatar_url = NULL WHERE id = ?').run(req.user.id);
+
+  const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  res.json({
+    ok: true,
+    user: publicUser(updatedUser),
+    message: 'Foto profil berhasil dihapus, kembali ke avatar emoji.'
+  });
 });
 
 module.exports = { router, requireAuth };

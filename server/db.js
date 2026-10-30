@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
   salt TEXT NOT NULL,
   full_name TEXT NOT NULL,
   avatar_emoji TEXT DEFAULT '🎓',
+  avatar_url TEXT,
   npm_nim TEXT,
   campus_name TEXT DEFAULT 'Universitas Katolik Santo Thomas (UNIKA UST)',
   faculty TEXT,
@@ -67,6 +68,10 @@ CREATE TABLE IF NOT EXISTS courses (
   lecturer TEXT,
   lecturer_contact TEXT,
   grade TEXT,                            -- A, A-, B+, etc.
+  weight_tugas INTEGER DEFAULT 20,       -- grading weight scale (%)
+  weight_uts INTEGER DEFAULT 30,
+  weight_uas INTEGER DEFAULT 40,
+  weight_lain INTEGER DEFAULT 10,        -- quiz / praktikum / kehadiran
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -126,6 +131,19 @@ CREATE TABLE IF NOT EXISTS portfolio_items (
   created_at TEXT DEFAULT (datetime('now'))
 );
 `);
+
+/* Migrate existing DBs that predate grading weight columns */
+function ensureColumn(table, column, ddlType) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+  if (!cols.includes(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddlType}`);
+  }
+}
+ensureColumn('courses', 'weight_tugas', 'INTEGER DEFAULT 20');
+ensureColumn('courses', 'weight_uts', 'INTEGER DEFAULT 30');
+ensureColumn('courses', 'weight_uas', 'INTEGER DEFAULT 40');
+ensureColumn('courses', 'weight_lain', 'INTEGER DEFAULT 10');
+ensureColumn('users', 'avatar_url', 'TEXT');
 
 /* ============================================================
  * GRADE POINT SCALE (UNIKA UST standard 4.00 scale)

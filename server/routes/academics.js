@@ -8,6 +8,12 @@ const { requireAuth } = require('./auth');
 const router = express.Router();
 router.use(requireAuth);
 
+function clampWeight(v, fallback) {
+  const n = parseInt(v, 10);
+  if (Number.isNaN(n)) return fallback;
+  return Math.min(Math.max(n, 0), 100);
+}
+
 /* ============================================================
  * SEMESTERS (Phase 1.1)
  * ============================================================ */
@@ -89,19 +95,27 @@ router.get('/courses', (req, res) => {
 
 // POST /api/academics/courses
 router.post('/courses', (req, res) => {
-  const { semester_id, course_code, course_name, sks = 3, day, start_time, end_time, room, lecturer, lecturer_contact, grade } = req.body;
+  const {
+    semester_id, course_code, course_name, sks = 3, day, start_time, end_time,
+    room, lecturer, lecturer_contact, grade,
+    weight_tugas, weight_uts, weight_uas, weight_lain
+  } = req.body;
   if (!course_code || !course_name) return res.status(400).json({ error: 'Kode dan nama matkul wajib diisi.' });
 
   const sem = db.prepare('SELECT id FROM semesters WHERE id = ? AND user_id = ?').get(semester_id, req.user.id);
   if (!sem) return res.status(404).json({ error: 'Semester tidak valid.' });
 
   const info = db.prepare(`
-    INSERT INTO courses (user_id, semester_id, course_code, course_name, sks, day, start_time, end_time, room, lecturer, lecturer_contact, grade)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO courses (
+      user_id, semester_id, course_code, course_name, sks, day, start_time, end_time,
+      room, lecturer, lecturer_contact, grade, weight_tugas, weight_uts, weight_uas, weight_lain
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(req.user.id, semester_id, course_code, course_name,
     Math.min(Math.max(parseInt(sks) || 3, 1), 12),
     day || null, start_time || null, end_time || null, room || null,
-    lecturer || null, lecturer_contact || null, grade || null);
+    lecturer || null, lecturer_contact || null, grade || null,
+    clampWeight(weight_tugas, 20), clampWeight(weight_uts, 30),
+    clampWeight(weight_uas, 40), clampWeight(weight_lain, 10));
 
   res.status(201).json({ ok: true, id: info.lastInsertRowid });
 });
@@ -111,12 +125,19 @@ router.put('/courses/:id', (req, res) => {
   const c = db.prepare('SELECT * FROM courses WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!c) return res.status(404).json({ error: 'Matkul tidak ditemukan.' });
 
-  const allowed = ['course_code', 'course_name', 'sks', 'day', 'start_time', 'end_time', 'room', 'lecturer', 'lecturer_contact', 'grade'];
+  const allowed = [
+    'course_code', 'course_name', 'sks', 'day', 'start_time', 'end_time',
+    'room', 'lecturer', 'lecturer_contact', 'grade',
+    'weight_tugas', 'weight_uts', 'weight_uas', 'weight_lain'
+  ];
+  const weightKeys = new Set(['weight_tugas', 'weight_uts', 'weight_uas', 'weight_lain']);
   const updates = [], values = [];
   for (const key of allowed) {
     if (key in req.body) {
       updates.push(`${key} = ?`);
-      values.push(key === 'sks' ? Math.min(Math.max(parseInt(req.body[key]) || 3, 1), 12) : req.body[key]);
+      if (key === 'sks') values.push(Math.min(Math.max(parseInt(req.body[key]) || 3, 1), 12));
+      else if (weightKeys.has(key)) values.push(clampWeight(req.body[key], c[key] ?? 0));
+      else values.push(req.body[key]);
     }
   }
   if (updates.length === 0) return res.status(400).json({ error: 'Tidak ada perubahan.' });

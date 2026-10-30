@@ -34,9 +34,33 @@ async function request(method, path, body) {
   return data;
 }
 
+async function upload(path, formData) {
+  const headers = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(path, {
+    method: 'POST',
+    headers,
+    body: formData
+  });
+
+  let data = {};
+  try { data = await res.json(); } catch { /* empty */ }
+
+  if (res.status === 401 && !path.startsWith('/api/auth/login')) {
+    setToken(null);
+    window.location.reload();
+    throw new Error(data.error || 'Sesi berakhir');
+  }
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+}
+
 export const api = {
   get: (path) => request('GET', path),
   post: (path, body) => request('POST', path, body),
   put: (path, body) => request('PUT', path, body),
-  del: (path) => request('DELETE', path)
+  del: (path) => request('DELETE', path),
+  upload: (path, formData) => upload(path, formData)
 };

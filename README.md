@@ -173,11 +173,11 @@ npm run dev
 
 Endpoint API yang memerlukan autentikasi menggunakan token sesi yang dikembalikan saat login atau registrasi. Header HTTP yang digunakan oleh klien harus sesuai dengan implementasi route pada folder `server/routes`.
 
-## Tentang Developer
+## Tentang Developer & Status Proyek
 
-- **Lead Developer:** Student Developer Team
-- **Program Studi:** Teknik Informatika, Fakultas Ilmu Komputer
-- **Institusi:** Universitas Katolik Santo Thomas (UNIKA UST), Medan
+- **Creator / Lead Developer:** XII DEV / SCARLET DEV
+- **GitHub:** [@Prof-Claret](https://github.com/Prof-Claret)
+- **Status Proyek:** Proyek Pribadi / Mandiri (Bukan atas nama kampus / institusi)
 - **Email:** `claretianovfx@gmail.com`
 
 ## Lisensi
@@ -186,4 +186,4 @@ Gradify didistribusikan di bawah lisensi MIT seperti yang tercantum pada `packag
 
 ## Hak Cipta
 
-© 2026 Gradify. All rights reserved. Built for Academic & Educational Excellence.
+© 2026 Gradify by XII DEV / SCARLET DEV (@Prof-Claret). Proyek independen untuk keunggulan akademik & Computer Science.

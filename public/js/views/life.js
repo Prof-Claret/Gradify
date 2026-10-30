@@ -6,8 +6,6 @@
  */
 import { esc, toast } from '../app.js';
 
-export default { render, subtitle };
-
 /* ---------- shared meta ---------- */
 const CATS = ['kos', 'makan', 'transport', 'buku', 'hiburan', 'lainnya'];
 const CAT_META = {
@@ -183,10 +181,11 @@ async function drawBudget(body, ctx) {
             </div>`}
       </div>
 
-      <!-- quick add -->
+      <!-- quick add / edit -->
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">➕ Tambah Cepat</p>
+        <p id="b-form-title" class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">➕ Tambah Cepat</p>
         <form id="b-add" class="space-y-2.5">
+          <input type="hidden" id="b-edit-id" value="" />
           <input id="b-title" class="g-inp" placeholder="cth. Beras 5kg · Jajan Mie Ayam" required />
           <div class="grid grid-cols-2 gap-2.5">
             <select id="b-cat" class="g-inp">
@@ -202,8 +201,9 @@ async function drawBudget(body, ctx) {
             <input id="b-date" type="date" value="${todayISO()}" class="g-inp" />
           </div>
           <div class="flex justify-end gap-2 pt-1">
-            <button type="reset" class="text-xs font-semibold px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600">Bersihkan</button>
-            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-xl">Simpan Transaksi</button>
+            <button type="button" id="b-cancel-edit" class="hidden text-xs font-semibold px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600">Batal Edit</button>
+            <button type="reset" id="b-reset" class="text-xs font-semibold px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600">Bersihkan</button>
+            <button type="submit" id="b-submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-xl">Simpan Transaksi</button>
           </div>
         </form>
       </div>
@@ -229,6 +229,7 @@ async function drawBudget(body, ctx) {
                   <p class="text-[11px] text-slate-400">${isInc ? 'Pemasukan' : `${CAT_META[cat].icon} ${CAT_META[cat].label}`} · ${fmtDate(i.occurred_at)}</p>
                 </div>
                 <span class="text-sm font-bold ${isInc ? 'text-emerald-600' : 'text-slate-700'} whitespace-nowrap">${isInc ? '+' : ''}${fmtIDR(i.amount)}</span>
+                <button class="b-edit text-slate-300 hover:text-indigo-600 px-1" data-id="${i.id}" title="Ubah">✏️</button>
                 <button class="b-del text-slate-300 hover:text-rose-600 px-1" data-id="${i.id}" title="Hapus">🗑</button>
               </div>`;
             }).join('')}
@@ -237,9 +238,48 @@ async function drawBudget(body, ctx) {
   </div>`;
 
   /* --- wire events --- */
+  const formTitle = body.querySelector('#b-form-title');
+  const editIdEl = body.querySelector('#b-edit-id');
+  const cancelEditBtn = body.querySelector('#b-cancel-edit');
+  const resetBtn = body.querySelector('#b-reset');
+  const submitBtn = body.querySelector('#b-submit');
+
+  function clearBudgetEditMode() {
+    editIdEl.value = '';
+    formTitle.textContent = '➕ Tambah Cepat';
+    submitBtn.textContent = 'Simpan Transaksi';
+    cancelEditBtn.classList.add('hidden');
+    resetBtn.classList.remove('hidden');
+  }
+
+  function fillBudgetForm(item) {
+    editIdEl.value = String(item.id);
+    body.querySelector('#b-title').value = item.title || '';
+    body.querySelector('#b-cat').value = CATS.includes(item.category) ? item.category : 'lainnya';
+    body.querySelector('#b-type').value = item.item_type === 'income' ? 'income' : 'expense';
+    body.querySelector('#b-amount').value = item.amount ?? '';
+    body.querySelector('#b-date').value = item.occurred_at || todayISO();
+    formTitle.textContent = '✏️ Ubah Transaksi';
+    submitBtn.textContent = 'Simpan Perubahan';
+    cancelEditBtn.classList.remove('hidden');
+    resetBtn.classList.add('hidden');
+    body.querySelector('#b-title').focus();
+  }
+
   body.querySelector('#b-month').addEventListener('change', e => {
     budgetMonth = e.target.value || currentMonth();
     drawBudget(body, ctx);
+  });
+
+  cancelEditBtn.addEventListener('click', () => {
+    body.querySelector('#b-add').reset();
+    body.querySelector('#b-date').value = todayISO();
+    clearBudgetEditMode();
+  });
+
+  body.querySelector('#b-add').addEventListener('reset', () => {
+    clearBudgetEditMode();
+    setTimeout(() => { body.querySelector('#b-date').value = todayISO(); }, 0);
   });
 
   body.querySelector('#b-add').addEventListener('submit', async e => {
@@ -251,13 +291,27 @@ async function drawBudget(body, ctx) {
       amount: parseFloat(body.querySelector('#b-amount').value),
       occurred_at: body.querySelector('#b-date').value || todayISO()
     };
-    if (!payload.title || !payload.amount) { toast('Judul dan nominal wajib diisi.', 'warn'); return; }
+    if (!payload.title || !(payload.amount >= 0) || Number.isNaN(payload.amount)) {
+      toast('Judul dan nominal wajib diisi.', 'warn');
+      return;
+    }
+    const editId = editIdEl.value;
     try {
-      await api.post('/api/life/budget', payload);
-      toast(payload.item_type === 'income' ? 'Pemasukan tercatat! 💼' : 'Pengeluaran tercatat! 🧾');
+      if (editId) {
+        await api.put(`/api/life/budget/${editId}`, payload);
+        toast('Transaksi diperbarui');
+      } else {
+        await api.post('/api/life/budget', payload);
+        toast(payload.item_type === 'income' ? 'Pemasukan tercatat! 💼' : 'Pengeluaran tercatat! 🧾');
+      }
       drawBudget(body, ctx);
     } catch (err) { toast(err.message, 'error'); }
   });
+
+  body.querySelectorAll('.b-edit').forEach(b => b.addEventListener('click', () => {
+    const item = items.find(x => String(x.id) === String(b.dataset.id));
+    if (item) fillBudgetForm(item);
+  }));
 
   body.querySelectorAll('.b-del').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('Hapus transaksi ini?')) return;
@@ -490,6 +544,7 @@ async function drawPortfolio(body, ctx) {
                         ${i.description ? `<p class="text-xs text-slate-500 mt-0.5 leading-relaxed">${esc(i.description)}</p>` : ''}
                       </div>
                       ${i.year ? `<span class="shrink-0 text-[10px] font-bold text-slate-500 bg-white border border-slate-200 rounded-full px-2.5 py-1">${esc(i.year)}</span>` : ''}
+                      <button class="p-edit shrink-0 text-slate-300 hover:text-indigo-600 px-1" data-id="${i.id}" title="Ubah">✏️</button>
                       <button class="p-del shrink-0 text-slate-300 hover:text-rose-600 px-1" data-id="${i.id}" title="Hapus">🗑</button>
                     </div>`).join('')}
                 </div>`}
@@ -504,10 +559,11 @@ async function drawPortfolio(body, ctx) {
           : ''}
       </div>
 
-      <!-- add form -->
+      <!-- add / edit form -->
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">➕ Tambah Item</p>
+        <p id="p-form-title" class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">➕ Tambah Item</p>
         <form id="p-add" class="space-y-2.5">
+          <input type="hidden" id="p-edit-id" value="" />
           <div>
             <label class="text-[10px] font-bold text-slate-400 uppercase">Jenis</label>
             <select id="p-type" class="g-inp">
@@ -528,13 +584,51 @@ async function drawPortfolio(body, ctx) {
             <label class="text-[10px] font-bold text-slate-400 uppercase">Deskripsi</label>
             <textarea id="p-desc" rows="3" class="g-inp" placeholder="Ringkasan singkat: peran, tech stack, capaian…"></textarea>
           </div>
-          <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl">Simpan Item</button>
+          <div class="flex flex-col gap-2">
+            <button type="submit" id="p-submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl">Simpan Item</button>
+            <button type="button" id="p-cancel-edit" class="hidden w-full text-xs font-semibold px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600">Batal Edit</button>
+          </div>
         </form>
       </div>
     </div>
   </div>`;
 
   /* --- wire events --- */
+  const pFormTitle = body.querySelector('#p-form-title');
+  const pEditId = body.querySelector('#p-edit-id');
+  const pSubmit = body.querySelector('#p-submit');
+  const pCancel = body.querySelector('#p-cancel-edit');
+
+  function clearPortfolioEditMode() {
+    pEditId.value = '';
+    pFormTitle.textContent = '➕ Tambah Item';
+    pSubmit.textContent = 'Simpan Item';
+    pCancel.classList.add('hidden');
+  }
+
+  function fillPortfolioForm(item) {
+    pEditId.value = String(item.id);
+    body.querySelector('#p-type').value = PTYPE_ORDER.includes(item.item_type) ? item.item_type : 'proyek';
+    body.querySelector('#p-title').value = item.title || '';
+    const y = item.year || String(nowYear);
+    const yearSel = body.querySelector('#p-year');
+    if (![...yearSel.options].some(o => o.value === String(y))) {
+      yearSel.insertAdjacentHTML('afterbegin', `<option value="${esc(String(y))}">${esc(String(y))}</option>`);
+    }
+    yearSel.value = String(y);
+    body.querySelector('#p-desc').value = item.description || '';
+    pFormTitle.textContent = '✏️ Ubah Item';
+    pSubmit.textContent = 'Simpan Perubahan';
+    pCancel.classList.remove('hidden');
+    body.querySelector('#p-title').focus();
+  }
+
+  pCancel.addEventListener('click', () => {
+    body.querySelector('#p-add').reset();
+    body.querySelector('#p-year').value = String(nowYear);
+    clearPortfolioEditMode();
+  });
+
   body.querySelector('#p-add').addEventListener('submit', async e => {
     e.preventDefault();
     const payload = {
@@ -544,12 +638,23 @@ async function drawPortfolio(body, ctx) {
       description: body.querySelector('#p-desc').value.trim()
     };
     if (!payload.title) { toast('Judul item wajib diisi.', 'warn'); return; }
+    const editId = pEditId.value;
     try {
-      await api.post('/api/life/portfolio', payload);
-      toast('Item portofolio disimpan! 🏅');
+      if (editId) {
+        await api.put(`/api/life/portfolio/${editId}`, payload);
+        toast('Item portofolio diperbarui');
+      } else {
+        await api.post('/api/life/portfolio', payload);
+        toast('Item portofolio disimpan! 🏅');
+      }
       drawPortfolio(body, ctx);
     } catch (err) { toast(err.message, 'error'); }
   });
+
+  body.querySelectorAll('.p-edit').forEach(b => b.addEventListener('click', () => {
+    const item = items.find(x => String(x.id) === String(b.dataset.id));
+    if (item) fillPortfolioForm(item);
+  }));
 
   body.querySelectorAll('.p-del').forEach(b => b.addEventListener('click', async () => {
     if (!confirm('Hapus item ini dari portofolio?')) return;
@@ -649,3 +754,5 @@ function injectStyles() {
   .g-inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px #e0e7ff}`;
   document.head.appendChild(s);
 }
+
+export default { render, subtitle };

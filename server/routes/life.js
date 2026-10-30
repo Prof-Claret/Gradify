@@ -36,6 +36,29 @@ router.post('/budget', (req, res) => {
   res.status(201).json({ ok: true, id: info.lastInsertRowid });
 });
 
+// PUT /api/life/budget/:id
+router.put('/budget/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM budget_items WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ error: 'Item tidak ditemukan.' });
+
+  const { category, title, amount, item_type, occurred_at } = req.body;
+  const cat = category !== undefined
+    ? (BUDGET_CATEGORIES.includes(category) ? category : 'lainnya')
+    : row.category;
+  const it = item_type !== undefined
+    ? (['expense', 'income'].includes(item_type) ? item_type : row.item_type)
+    : row.item_type;
+  const amt = amount !== undefined ? Math.abs(parseFloat(amount) || 0) : row.amount;
+  const ttl = title !== undefined ? String(title).trim() : row.title;
+  if (!ttl) return res.status(400).json({ error: 'Judul wajib diisi.' });
+
+  db.prepare(`UPDATE budget_items SET
+      category = ?, title = ?, amount = ?, item_type = ?, occurred_at = ?
+    WHERE id = ? AND user_id = ?`)
+    .run(cat, ttl, amt, it, occurred_at || row.occurred_at, row.id, req.user.id);
+  res.json({ ok: true });
+});
+
 // DELETE /api/life/budget/:id
 router.delete('/budget/:id', (req, res) => {
   const info = db.prepare('DELETE FROM budget_items WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
@@ -120,6 +143,29 @@ router.post('/portfolio', (req, res) => {
   const info = db.prepare('INSERT INTO portfolio_items (user_id, item_type, title, description, year) VALUES (?, ?, ?, ?, ?)')
     .run(req.user.id, item_type, title, description || null, year || null);
   res.status(201).json({ ok: true, id: info.lastInsertRowid });
+});
+
+// PUT /api/life/portfolio/:id
+router.put('/portfolio/:id', (req, res) => {
+  const row = db.prepare('SELECT * FROM portfolio_items WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ error: 'Item tidak ditemukan.' });
+
+  const { item_type, title, description, year } = req.body;
+  const ttl = title !== undefined ? String(title).trim() : row.title;
+  if (!ttl) return res.status(400).json({ error: 'Judul item wajib diisi.' });
+
+  db.prepare(`UPDATE portfolio_items SET
+      item_type = ?, title = ?, description = ?, year = ?
+    WHERE id = ? AND user_id = ?`)
+    .run(
+      item_type !== undefined ? item_type : row.item_type,
+      ttl,
+      description !== undefined ? (description || null) : row.description,
+      year !== undefined ? (year || null) : row.year,
+      row.id,
+      req.user.id
+    );
+  res.json({ ok: true });
 });
 
 // DELETE /api/life/portfolio/:id

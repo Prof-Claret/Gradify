@@ -130,6 +130,7 @@ export async function render(main, ctx) {
         ${c.day ? `<p>📅 ${esc(c.day)} ${esc(c.start_time || '')}${c.end_time ? '–' + esc(c.end_time) : ''}</p>` : ''}
         ${c.room ? `<p>📍 ${esc(c.room)}</p>` : ''}
         ${c.lecturer ? `<p>👨‍🏫 ${esc(c.lecturer)}${c.lecturer_contact ? ` · <a class="text-indigo-600" href="${esc(c.lecturer_contact.replace(/[^\w@.\-\d\\\+\/:]/g, '') || '#')}">${esc(c.lecturer_contact)}</a>` : ''}</p>` : ''}
+        <p class="text-[10px] text-slate-400 pt-0.5">Bobot: Tugas ${c.weight_tugas ?? 20}% · UTS ${c.weight_uts ?? 30}% · UAS ${c.weight_uas ?? 40}% · Lain ${c.weight_lain ?? 10}%</p>
       </div>
       <div class="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-100">
         <label class="text-[10px] text-slate-500">Nilai</label>
@@ -195,6 +196,29 @@ export async function render(main, ctx) {
             <label class="g-lbl">Kontak Dosen (email/WA)</label>
             <input name="lecturer_contact" value="${course ? esc(course.lecturer_contact || '') : ''}" class="g-inp" placeholder="cth. dosen@ust.ac.id" />
           </div>
+          <div class="md:col-span-2">
+            <label class="g-lbl">Skala Bobot Penilaian (%)</label>
+            <p class="text-[10px] text-slate-400 mb-2">Disarankan total 100%. Default UNIKA-style: Tugas 20 · UTS 30 · UAS 40 · Lain 10.</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div>
+                <label class="g-lbl">Tugas</label>
+                <input name="weight_tugas" type="number" min="0" max="100" value="${course?.weight_tugas ?? 20}" class="g-inp" />
+              </div>
+              <div>
+                <label class="g-lbl">UTS</label>
+                <input name="weight_uts" type="number" min="0" max="100" value="${course?.weight_uts ?? 30}" class="g-inp" />
+              </div>
+              <div>
+                <label class="g-lbl">UAS</label>
+                <input name="weight_uas" type="number" min="0" max="100" value="${course?.weight_uas ?? 40}" class="g-inp" />
+              </div>
+              <div>
+                <label class="g-lbl">Lain</label>
+                <input name="weight_lain" type="number" min="0" max="100" value="${course?.weight_lain ?? 10}" class="g-inp" />
+              </div>
+            </div>
+            <p id="cm-weight-sum" class="text-[11px] text-slate-500 mt-2">Total bobot: 100%</p>
+          </div>
           ${course ? `
           <div>
             <label class="g-lbl">Nilai (Grade)</label>
@@ -215,11 +239,24 @@ export async function render(main, ctx) {
     body.querySelector('#cm-cancel').addEventListener('click', close);
     modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
 
-    body.querySelector('#cm-form').addEventListener('submit', async (e) => {
+    const form = body.querySelector('#cm-form');
+    const sumEl = body.querySelector('#cm-weight-sum');
+    const weightNames = ['weight_tugas', 'weight_uts', 'weight_uas', 'weight_lain'];
+    function refreshWeightSum() {
+      const total = weightNames.reduce((a, n) => a + (parseInt(form.elements[n]?.value, 10) || 0), 0);
+      sumEl.textContent = `Total bobot: ${total}%`;
+      sumEl.className = `text-[11px] mt-2 ${total === 100 ? 'text-emerald-600' : 'text-amber-600'}`;
+      if (total !== 100) sumEl.textContent += ' (disarankan 100%)';
+    }
+    weightNames.forEach(n => form.elements[n]?.addEventListener('input', refreshWeightSum));
+    refreshWeightSum();
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
       const payload = Object.fromEntries(f.entries());
       if (!payload.grade) delete payload.grade;
+      for (const n of weightNames) payload[n] = parseInt(payload[n], 10) || 0;
       try {
         if (course) {
           await api.put(`/api/academics/courses/${course.id}`, payload);

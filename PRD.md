@@ -140,9 +140,9 @@
 * **Licensing & Copyright:** © 2026 Gradify. All rights reserved. Built for Academic & Educational Excellence.
 
 ### 4.2 About Developer (Tentang Pengembang)
-* **Lead Developer / Creator:** Student Developer Team (Fakultas Ilmu Komputer - Teknik Informatika)
-* **Affiliation:** Universitas Katolik Santo Thomas (UNIKA UST Medan)
+* **Lead Developer / Creator:** XII DEV / SCARLET DEV
+* **GitHub:** [@Prof-Claret](https://github.com/Prof-Claret)
+* **Ownership Status:** Proyek Mandiri / Personal Project (Bukan proyek atas nama kampus)
 * **Developer Vision:** Berkomitmen untuk menciptakan solusi perangkat lunak berstandar tinggi yang mampu menyelesaikan permasalahan nyata di dunia akademik dan mendukung rekan-rekan mahasiswa meraih predikat kelulusan terbaik (*Cum Laude*).
 * **Contact & Feedback Support:** 
-  * Email Support: `support@gradify.ac.id`
-  * Institutional Campus: Universitas Katolik Santo Thomas Medan, North Sumatra, Indonesia
+  * Email Support: `claretianovfx@gmail.com`

@@ -57,6 +57,17 @@ export const routes = {
   about:        { module: '/js/views/about.js',      group: null,  icon: 'ℹ️', label: 'Tentang' }
 };
 
+/** Baca route dari hash URL (dipakai saat refresh / deep-link). */
+function syncRouteFromHash() {
+  const [base, ...rest] = window.location.hash.replace(/^#/, '').split('/').filter(Boolean);
+  if (base && routes[base]) {
+    state.currentRoute = rest.length ? `${base}/${rest.join('/')}` : base;
+  } else {
+    state.currentRoute = 'dashboard';
+  }
+  return state.currentRoute;
+}
+
 /* navigate via hash */
 export function navigate(route, subTab) {
   if (!routes[route]) route = 'dashboard';
@@ -141,21 +152,32 @@ function renderSidebar() {
 }
 
 function refreshSidebarActive() {
+  const activeBase = String(state.currentRoute || 'dashboard').split('/')[0];
   document.querySelectorAll('#sidebar-nav .nav-item').forEach(a => {
-    a.classList.toggle('active', a.dataset.route === state.currentRoute);
+    a.classList.toggle('active', a.dataset.route === activeBase);
   });
 }
 
 function renderProfileBadge() {
   const u = state.user;
+  const sidebarAvatar = u.avatar_url
+    ? `<img src="${esc(u.avatar_url)}" alt="${esc(u.full_name)}" class="w-10 h-10 rounded-full object-cover border border-indigo-400/40 shadow-sm" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-xl\\'>${esc(u.avatar_emoji || '🎓')}</div>'" />`
+    : `<div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-xl">${esc(u.avatar_emoji || '🎓')}</div>`;
+
   document.getElementById('sidebar-profile').innerHTML = `
-    <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-xl">${esc(u.avatar_emoji || '🎓')}</div>
+    ${sidebarAvatar}
     <div class="min-w-0">
       <p class="text-white text-sm font-semibold truncate">${esc(u.full_name)}</p>
       <p class="text-[11px] text-slate-400 truncate">Semester ${u.active_semester} · ${esc((u.study_program || 'Program Studi'))}</p>
     </div>`;
-  document.getElementById('topbar-avatar').innerHTML = `
-    <button id="btn-avatar" class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-lg hover:ring-2 ring-indigo-400" title="${esc(u.full_name)}">${esc(u.avatar_emoji || '🎓')}</button>`;
+
+  const topbarAvatar = u.avatar_url
+    ? `<button id="btn-avatar" class="w-9 h-9 rounded-full overflow-hidden hover:ring-2 ring-indigo-400 border border-slate-200" title="${esc(u.full_name)}">
+        <img src="${esc(u.avatar_url)}" alt="${esc(u.full_name)}" class="w-full h-full object-cover" onerror="this.outerHTML='<div class=\\'w-full h-full bg-indigo-100 flex items-center justify-center text-lg\\'>${esc(u.avatar_emoji || '🎓')}</div>'" />
+      </button>`
+    : `<button id="btn-avatar" class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-lg hover:ring-2 ring-indigo-400" title="${esc(u.full_name)}">${esc(u.avatar_emoji || '🎓')}</button>`;
+
+  document.getElementById('topbar-avatar').innerHTML = topbarAvatar;
   document.getElementById('btn-avatar').addEventListener('click', () => navigate('profile'));
 }
 
@@ -207,6 +229,7 @@ function showApp() {
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app-shell').classList.remove('hidden');
   document.getElementById('splash').classList.add('hidden');
+  syncRouteFromHash();
   renderSidebar();
   renderProfileBadge();
   renderView();
@@ -234,15 +257,14 @@ document.getElementById('btn-mobile-menu').addEventListener('click', openMobileS
 document.getElementById('sidebar-backdrop').addEventListener('click', closeMobileSidebar);
 
 window.addEventListener('hashchange', () => {
-  const [base, ...rest] = window.location.hash.replace('#', '').split('/').filter(Boolean);
-  const target = base || 'dashboard';
-  if (target !== state.currentRoute) {
-    state.currentRoute = target;
-    refreshSidebarActive();
-    document.getElementById('page-title').textContent = (routes[target] || routes.dashboard).label;
-    renderView();
-    closeMobileSidebar();
-  }
+  const prev = state.currentRoute;
+  syncRouteFromHash();
+  if (state.currentRoute === prev) return;
+  refreshSidebarActive();
+  const base = String(state.currentRoute).split('/')[0];
+  document.getElementById('page-title').textContent = (routes[base] || routes.dashboard).label;
+  renderView();
+  closeMobileSidebar();
 });
 
 (async function boot() {
