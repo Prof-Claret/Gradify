@@ -125,7 +125,6 @@
 ### Phase 3 & 4: GPA Projection, Life & Career Extensions
 * **GPA Calculator & Cum Laude Target Simulator (Filtered by Semester & Cumulative)**
 * **Final Project / Skripsi Milestone Tracker**
-* **Student Budget & Kos Expense Tracker**
 * **Student Portfolio & CV Auto-Builder**
 
 ---
@@ -134,7 +133,7 @@
 
 ### 4.1 About App (Tentang Aplikasi)
 * **Application Title:** Gradify
-* **Current Version:** v1.0.0 (Beta Release)
+* **Current Version:** v1.0.0
 * **Description:** Gradify adalah *Academic & Computer Science Super-App* yang dirancang khusus untuk membantu mahasiswa mengelola seluruh aspek perkuliahan secara terstruktur, intuitif, dan efisien. Aplikasi ini mengintegrasikan manajemen semester, jadwal kuliah, pelacak tugas, kalkulator IPK/IPS, manajemen skripsi, pencatatan kode, hingga toolkit penyelesai soal Matematika Diskrit dan Informatika.
 * **Core Technologies:** HTML5, Modern JavaScript (ES6+), Tailwind CSS, MathJax (LaTeX Renderer), Node.js, and Relational Database Architecture.
 * **Licensing & Copyright:** © 2026 Gradify. All rights reserved. Built for Academic & Educational Excellence.

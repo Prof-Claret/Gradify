@@ -201,7 +201,7 @@ PRD membagi pengembangan menjadi beberapa fase:
 - **Phase 0:** registrasi, wizard onboarding, profil identitas, dan keamanan akun.
 - **Phase 1:** semester, mata kuliah, dashboard tugas, dan catatan perkuliahan CS.
 - **Phase 2:** kalkulator ilmiah, toolkit matematika dan matematika diskrit, serta tools SQL, regex, CIDR, dan Big-O.
-- **Phase 3-4:** target GPA lanjutan, milestone skripsi, budget mahasiswa, dan builder portfolio/CV.
+- **Phase 3-4:** target GPA lanjutan, milestone skripsi, dan builder portfolio/CV.
 
 Beberapa fitur roadmap, termasuk OAuth Google/Apple, dapat memerlukan integrasi pihak ketiga atau implementasi lanjutan dan belum menjadi bagian wajib dari aplikasi lokal saat ini.
 
