@@ -129,8 +129,8 @@ function navGroup(group, items) {
 }
 function renderNavItem(key) {
   const r = routes[key];
-  return `<a class="nav-item" data-route="${key}" href="#${key}">
-    <span class="text-base w-5 text-center">${r.icon}</span><span>${esc(r.label)}</span></a>`;
+  return `<a class="nav-item cursor-pointer" data-route="${key}" href="#${key}">
+    <span class="text-base w-5 text-center pointer-events-none">${r.icon}</span><span class="pointer-events-none">${esc(r.label)}</span></a>`;
 }
 
 function renderSidebar() {
@@ -149,13 +149,6 @@ function renderSidebar() {
     .concat([bottom.map(renderNavItem).join('')])
     .filter(Boolean).join('');
   document.getElementById('sidebar-nav').innerHTML = html;
-  document.querySelectorAll('#sidebar-nav .nav-item').forEach(a => {
-    a.addEventListener('click', (e) => {
-      e.preventDefault();
-      closeMobileSidebar();
-      navigate(a.dataset.route);
-    });
-  });
   refreshSidebarActive();
 }
 
@@ -221,12 +214,20 @@ export async function loadSemesterSwitcher() {
 
 /* ---------- mobile sidebar ---------- */
 function closeMobileSidebar() {
-  document.getElementById('sidebar').classList.add('-translate-x-full');
-  document.getElementById('sidebar-backdrop').classList.add('hidden');
+  const sb = document.getElementById('sidebar');
+  if (sb) {
+    sb.classList.remove('open');
+    sb.classList.add('-translate-x-full');
+  }
+  document.getElementById('sidebar-backdrop')?.classList.add('hidden');
 }
 function openMobileSidebar() {
-  document.getElementById('sidebar').classList.remove('-translate-x-full');
-  document.getElementById('sidebar-backdrop').classList.remove('hidden');
+  const sb = document.getElementById('sidebar');
+  if (sb) {
+    sb.classList.add('open');
+    sb.classList.remove('-translate-x-full');
+  }
+  document.getElementById('sidebar-backdrop')?.classList.remove('hidden');
 }
 
 /* ---------- auth gate ---------- */
@@ -248,6 +249,7 @@ function showApp() {
   renderProfileBadge();
   renderView();
   loadSemesterSwitcher();
+  refreshSidebarActive();
 }
 
 function showAuth() {
@@ -266,16 +268,43 @@ function showAuth() {
   }));
 }
 
-/* ---------- boot ---------- */
-document.getElementById('btn-mobile-menu')?.addEventListener('click', openMobileSidebar);
-document.getElementById('btn-sidebar-close')?.addEventListener('click', closeMobileSidebar);
-document.getElementById('sidebar-backdrop')?.addEventListener('click', closeMobileSidebar);
-document.getElementById('bnav-menu-btn')?.addEventListener('click', openMobileSidebar);
-document.querySelectorAll('#mobile-bottom-nav .bnav-btn').forEach(btn => {
-  btn.addEventListener('click', (e) => {
+/* ---------- boot & event delegation ---------- */
+document.getElementById('btn-mobile-menu')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  openMobileSidebar();
+});
+document.getElementById('btn-sidebar-close')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  closeMobileSidebar();
+});
+document.getElementById('sidebar-backdrop')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  closeMobileSidebar();
+});
+
+// Event delegation for sidebar navigation links
+document.getElementById('sidebar-nav')?.addEventListener('click', (e) => {
+  const item = e.target.closest('.nav-item');
+  if (!item) return;
+  e.preventDefault();
+  const route = item.dataset.route;
+  closeMobileSidebar();
+  if (route) navigate(route);
+});
+
+// Event delegation for mobile bottom navigation bar
+document.getElementById('mobile-bottom-nav')?.addEventListener('click', (e) => {
+  const menuBtn = e.target.closest('#bnav-menu-btn');
+  if (menuBtn) {
+    e.preventDefault();
+    openMobileSidebar();
+    return;
+  }
+  const btn = e.target.closest('.bnav-btn');
+  if (btn && btn.dataset.route) {
     e.preventDefault();
     navigate(btn.dataset.route);
-  });
+  }
 });
 
 window.addEventListener('hashchange', () => {

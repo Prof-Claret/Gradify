@@ -126,9 +126,6 @@ export async function render(main, ctx) {
       <p class="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">${esc(sub)}</p>
     </div>`;
   }
-      <p class="text-[11px] text-slate-400 mt-1">${esc(sub)}</p>
-    </div>`;
-  }
   function emptyState(icon, title, sub) {
     return `<div class="text-center py-8"><p class="text-3xl">${icon}</p><p class="font-semibold text-slate-700 mt-2 text-sm">${esc(title)}</p><p class="text-xs text-slate-400">${esc(sub)}</p></div>`;
   }
