@@ -53,7 +53,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(``);
-  console.log(`  🎓 Gradify v1.0.0 (Beta) — Simplify Your Academic Journey`);
+  console.log(`  🎓 Gradify v1.0.0 — Simplify Your Academic Journey`);
   console.log(`  ➜  Server berjalan di:  http://localhost:${PORT}`);
   console.log(`  ➜  Dashboard admin:     http://localhost:${PORT}/admin`);
   console.log(`  ➜  Database:            ${DB_PATH} (SQLite)`);

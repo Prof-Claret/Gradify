@@ -28,14 +28,13 @@ const DATA_TABLES = [
   'courses',
   'tasks',
   'notes',
-  'budget_items',
   'skripsi_milestones',
   'portfolio_items',
   'app_settings'
 ];
 const RESET_SEQUENCE_TABLES = [
   'users', 'semesters', 'courses', 'tasks', 'notes',
-  'budget_items', 'skripsi_milestones', 'portfolio_items'
+  'skripsi_milestones', 'portfolio_items'
 ];
 
 const backupUpload = multer({
@@ -448,7 +447,6 @@ router.get('/users/:id', (req, res) => {
     courses: db.prepare('SELECT COUNT(*) AS c FROM courses WHERE user_id = ?').get(user.id).c,
     notes: db.prepare('SELECT COUNT(*) AS c FROM notes WHERE user_id = ?').get(user.id).c,
     tasks: db.prepare('SELECT COUNT(*) AS c FROM tasks WHERE user_id = ?').get(user.id).c,
-    budget_items: db.prepare('SELECT COUNT(*) AS c FROM budget_items WHERE user_id = ?').get(user.id).c,
     skripsi_milestones: db.prepare('SELECT COUNT(*) AS c FROM skripsi_milestones WHERE user_id = ?').get(user.id).c,
     portfolio_items: db.prepare('SELECT COUNT(*) AS c FROM portfolio_items WHERE user_id = ?').get(user.id).c
   };

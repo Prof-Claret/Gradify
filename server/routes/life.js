@@ -1,5 +1,5 @@
 /**
- * Gradify Life Routes — Budget, Skripsi Milestones, Portfolio (Phase 3 & 4)
+ * Gradify Life Routes — Skripsi Milestones, Portfolio (Phase 3 & 4)
  */
 const express = require('express');
 const { db } = require('../db');
@@ -7,64 +7,6 @@ const { requireAuth } = require('./auth');
 
 const router = express.Router();
 router.use(requireAuth);
-
-/* ========== BUDGET / KOS EXPENSE TRACKER ========== */
-const BUDGET_CATEGORIES = ['kos', 'makan', 'transport', 'buku', 'hiburan', 'lainnya'];
-
-// GET /api/life/budget
-router.get('/budget', (req, res) => {
-  const items = db.prepare('SELECT * FROM budget_items WHERE user_id = ? ORDER BY occurred_at DESC, id DESC').all(req.user.id);
-  const month = req.query.month || new Date().toISOString().slice(0, 7);
-  const monthItems = items.filter(i => i.occurred_at.startsWith(month));
-  const expenses = monthItems.filter(i => i.item_type === 'expense').reduce((a, i) => a + i.amount, 0);
-  const income = monthItems.filter(i => i.item_type === 'income').reduce((a, i) => a + i.amount, 0);
-  const byCategory = {};
-  for (const cat of BUDGET_CATEGORIES) {
-    byCategory[cat] = monthItems.filter(i => i.item_type === 'expense' && i.category === cat).reduce((a, i) => a + i.amount, 0);
-  }
-  res.json({ items, month, totals: { expenses, income, balance: income - expenses }, byCategory });
-});
-
-// POST /api/life/budget
-router.post('/budget', (req, res) => {
-  const { category, title, amount, item_type = 'expense', occurred_at } = req.body;
-  if (!title || amount === undefined) return res.status(400).json({ error: 'Judul dan nominal wajib diisi.' });
-  const cat = BUDGET_CATEGORIES.includes(category) ? category : 'lainnya';
-  const it = ['expense', 'income'].includes(item_type) ? item_type : 'expense';
-  const info = db.prepare('INSERT INTO budget_items (user_id, category, title, amount, item_type, occurred_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(req.user.id, cat, title, Math.abs(parseFloat(amount) || 0), it, occurred_at || new Date().toISOString().slice(0, 10));
-  res.status(201).json({ ok: true, id: info.lastInsertRowid });
-});
-
-// PUT /api/life/budget/:id
-router.put('/budget/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM budget_items WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
-  if (!row) return res.status(404).json({ error: 'Item tidak ditemukan.' });
-
-  const { category, title, amount, item_type, occurred_at } = req.body;
-  const cat = category !== undefined
-    ? (BUDGET_CATEGORIES.includes(category) ? category : 'lainnya')
-    : row.category;
-  const it = item_type !== undefined
-    ? (['expense', 'income'].includes(item_type) ? item_type : row.item_type)
-    : row.item_type;
-  const amt = amount !== undefined ? Math.abs(parseFloat(amount) || 0) : row.amount;
-  const ttl = title !== undefined ? String(title).trim() : row.title;
-  if (!ttl) return res.status(400).json({ error: 'Judul wajib diisi.' });
-
-  db.prepare(`UPDATE budget_items SET
-      category = ?, title = ?, amount = ?, item_type = ?, occurred_at = ?
-    WHERE id = ? AND user_id = ?`)
-    .run(cat, ttl, amt, it, occurred_at || row.occurred_at, row.id, req.user.id);
-  res.json({ ok: true });
-});
-
-// DELETE /api/life/budget/:id
-router.delete('/budget/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM budget_items WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
-  if (info.changes === 0) return res.status(404).json({ error: 'Item tidak ditemukan.' });
-  res.json({ ok: true });
-});
 
 /* ========== SKRIPSI / TA MILESTONE TRACKER ========== */
 const SKRIPSI_TEMPLATE = [

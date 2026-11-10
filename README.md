@@ -4,7 +4,7 @@
 
 Gradify adalah aplikasi akademik all-in-one untuk mahasiswa yang menggabungkan pengelolaan semester, mata kuliah, tugas, catatan perkuliahan, kalkulator IPK/IPS, dan bantuan akademik lainnya dalam satu platform. Gradify memiliki preset kampus Universitas Katolik Santo Thomas (UNIKA UST) Medan serta dukungan profil kampus custom.
 
-> Versi saat ini: **v1.0.0 Beta**  
+> Versi saat ini: **v1.0.0**  
 > Lisensi: **MIT**
 
 ## Fitur Utama

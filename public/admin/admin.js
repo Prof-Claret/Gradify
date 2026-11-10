@@ -679,7 +679,6 @@ async function openUserModal(id) {
           ${countCard('Matkul', data.counts.courses, '📚')}
           ${countCard('Catatan', data.counts.notes, '📝')}
           ${countCard('Tugas', data.counts.tasks, '📋')}
-          ${countCard('Budget', data.counts.budget_items, '💰')}
           ${countCard('Skripsi', data.counts.skripsi_milestones, '📗')}
           ${countCard('Portofolio', data.counts.portfolio_items, '🏅')}
         </div>

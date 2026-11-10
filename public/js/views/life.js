@@ -1,21 +1,9 @@
 /**
- * Gradify Life Hub (Phase 3 & 4) — satu modul untuk 3 route:
- *   budget    → 💰 Budget Kos (expense & income tracker)
+ * Gradify Life Hub (Phase 3 & 4) — satu modul untuk 2 route:
  *   skripsi   → 📗 Skripsi Tracker (milestone pipeline)
  *   portfolio → 🏅 Portfolio & CV Auto-Builder
  */
 import { esc, toast } from '../app.js';
-
-/* ---------- shared meta ---------- */
-const CATS = ['kos', 'makan', 'transport', 'buku', 'hiburan', 'lainnya'];
-const CAT_META = {
-  kos:       { label: 'Kos',       icon: '🏠', color: '#6366f1' },
-  makan:     { label: 'Makan',     icon: '🍜', color: '#f59e0b' },
-  transport: { label: 'Transport', icon: '🛵', color: '#10b981' },
-  buku:      { label: 'Buku',      icon: '📚', color: '#3b82f6' },
-  hiburan:   { label: 'Hiburan',   icon: '🎮', color: '#ec4899' },
-  lainnya:   { label: 'Lainnya',   icon: '📦', color: '#94a3b8' }
-};
 
 const STATUS_ORDER = ['belum', 'berlangsung', 'selesai'];
 const STATUS_META = {
@@ -46,19 +34,18 @@ const PTYPE_META = {
 const PTYPE_ORDER = ['proyek', 'prestasi', 'sertifikasi', 'organisasi', 'magang'];
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
-const currentMonth = () => new Date().toISOString().slice(0, 7);
 const fmtDate = (s) => {
   if (!s) return '—';
   const d = new Date(s);
   return isNaN(d) ? esc(s) : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-export const subtitle = () => 'Budget kos, milestone skripsi, dan CV otomatis — kelola hidup mahasmu 🎓';
+export const subtitle = () => 'Milestone skripsi, dan CV otomatis — kelola hidup mahasmu 🎓';
 
 export async function render(main, ctx, extra) {
   injectStyles();
   const base = String(ctx.currentRoute || '').split('/')[0];
-  const active = ['budget', 'skripsi', 'portfolio'].includes(base) ? base : 'budget';
+  const active = ['skripsi', 'portfolio'].includes(base) ? base : 'skripsi';
 
   const pill = (key, icon, label) => `
     <button data-life="${key}" class="text-xs font-semibold px-3 py-1.5 rounded-lg transition shrink-0
@@ -69,10 +56,9 @@ export async function render(main, ctx, extra) {
   <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
     <div>
       <h3 class="font-bold text-slate-800">🌱 Kehidupan Mahasiswa</h3>
-      <p class="text-xs text-slate-500">Phase 3 & 4 · Budget Kos · Skripsi Tracker · Portfolio & CV</p>
+      <p class="text-xs text-slate-500">Phase 3 & 4 · Skripsi Tracker · Portfolio & CV</p>
     </div>
     <div class="bg-white p-1 rounded-xl border border-slate-200 shadow-sm flex overflow-x-auto no-scrollbar gap-0.5 w-full sm:w-auto">
-      ${pill('budget', '💰', 'Budget Kos')}
       ${pill('skripsi', '📗', 'Skripsi')}
       ${pill('portfolio', '🏅', 'Portofolio & CV')}
     </div>
@@ -83,244 +69,8 @@ export async function render(main, ctx, extra) {
     b.addEventListener('click', () => ctx.navigate(b.dataset.life)));
 
   const body = main.querySelector('#life-body');
-  if (active === 'skripsi') await drawSkripsi(body, ctx);
-  else if (active === 'portfolio') await drawPortfolio(body, ctx);
-  else await drawBudget(body, ctx);
-}
-
-/* ================================================================ */
-/* 💰 BUDGET / KOS EXPENSE TRACKER                                   */
-/* ================================================================ */
-
-let budgetMonth = null; // dipertahankan saat berpindah sub-route
-
-async function drawBudget(body, ctx) {
-  const { api, toast, fmtIDR } = ctx;
-  const month = budgetMonth || currentMonth();
-  budgetMonth = month;
-
-  let data;
-  try {
-    data = await api.get(`/api/life/budget?month=${month}`);
-  } catch (e) { toast(e.message, 'error'); return; }
-
-  const items = (data.items || [])
-    .filter(i => String(i.occurred_at || '').startsWith(month))
-    .sort((a, b) => String(b.occurred_at).localeCompare(String(a.occurred_at)) || (b.id - a.id));
-  const { income = 0, expenses = 0, balance = 0 } = data.totals || {};
-  const byCat = data.byCategory || {};
-
-  /* --- chart: % dari total pengeluaran --- */
-  const chartRows = CATS.map(c => {
-    const val = Number(byCat[c] || 0);
-    const pct = expenses > 0 ? Math.round((val / expenses) * 100) : 0;
-    return { cat: c, val, pct };
-  }).filter(r => r.val > 0).sort((a, b) => b.val - a.val);
-
-  /* --- savings tip --- */
-  let tip = '';
-  if (income > 0) {
-    const pct = Math.round((balance / income) * 100);
-    tip = balance >= income * 0.3
-      ? `<div class="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-3.5 text-sm font-semibold mt-4">🎉 Rapi! Kamu nabung ${pct}% dari pemasukan bulan ini. Lanjutkan kebiasaan baikmu!</div>`
-      : `<div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3.5 text-sm font-semibold mt-4">⚠️ Hati-hati! Pengeluaranmu sudah melebihi 70% pemasukan (${pct}% tersisa). Coba kurangi ${CAT_META.hiburan.icon} hiburan dulu minggu ini ya.</div>`;
-  } else if (expenses > 0) {
-    tip = `<div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-3.5 text-sm font-semibold mt-4">⚠️ Belum ada pemasukan yang tercatat bulan ini.</div>`;
-  }
-
-  body.innerHTML = `
-  <div class="space-y-5">
-
-    <!-- month selector -->
-    <div class="flex flex-wrap items-center gap-3">
-      <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">Bulan</label>
-      <input id="b-month" type="month" value="${esc(month)}"
-        class="g-inp !w-auto text-sm" />
-      <span class="text-xs text-slate-400">${items.length} transaksi tercatat</span>
-    </div>
-
-    <!-- summary cards -->
-    <div class="grid sm:grid-cols-3 gap-4">
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs font-bold text-slate-400 uppercase">Pemasukan</p>
-        <p class="text-xl font-extrabold text-emerald-600 mt-1">${fmtIDR(income)}</p>
-        <p class="text-xs text-slate-400 mt-1">💼 Total uang masuk</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs font-bold text-slate-400 uppercase">Pengeluaran</p>
-        <p class="text-xl font-extrabold text-rose-600 mt-1">${fmtIDR(expenses)}</p>
-        <p class="text-xs text-slate-400 mt-1">🛒 Total uang keluar</p>
-      </div>
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs font-bold text-slate-400 uppercase">Saldo</p>
-        <p class="text-xl font-extrabold mt-1 ${balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${fmtIDR(balance)}</p>
-        <p class="text-xs text-slate-400 mt-1">⚖️ Pemasukan − Pengeluaran</p>
-      </div>
-    </div>
-    ${tip}
-
-    <!-- category chart + quick add -->
-    <div class="grid lg:grid-cols-2 gap-5">
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">📊 Pengeluaran per Kategori</p>
-        ${chartRows.length === 0
-          ? '<p class="text-sm text-slate-400 text-center py-8">Belum ada pengeluaran bulan ini.</p>'
-          : `<div class="space-y-3">
-              ${chartRows.map(r => {
-                const m = CAT_META[r.cat];
-                return `<div>
-                  <div class="flex items-center justify-between text-xs mb-1">
-                    <span class="font-semibold text-slate-700">${m.icon} ${m.label}</span>
-                    <span class="text-slate-500 font-semibold">${ctx.fmtIDR(r.val)} · ${r.pct}%</span>
-                  </div>
-                  <div class="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div class="h-full rounded-full" style="width:${Math.max(r.pct, 1)}%;background:${m.color}"></div>
-                  </div>
-                </div>`;
-              }).join('')}
-            </div>`}
-      </div>
-
-      <!-- quick add / edit -->
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-        <p id="b-form-title" class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">➕ Tambah Cepat</p>
-        <form id="b-add" class="space-y-2.5">
-          <input type="hidden" id="b-edit-id" value="" />
-          <input id="b-title" class="g-inp" placeholder="cth. Beras 5kg · Jajan Mie Ayam" required />
-          <div class="grid grid-cols-2 gap-2.5">
-            <select id="b-cat" class="g-inp">
-              ${CATS.map(c => `<option value="${c}">${CAT_META[c].icon} ${CAT_META[c].label}</option>`).join('')}
-            </select>
-            <select id="b-type" class="g-inp">
-              <option value="expense">Pengeluaran</option>
-              <option value="income">Pemasukan</option>
-            </select>
-          </div>
-          <div class="grid grid-cols-2 gap-2.5">
-            <input id="b-amount" type="number" min="0" step="0.01" class="g-inp" placeholder="Nominal (Rp)" required />
-            <input id="b-date" type="date" value="${todayISO()}" class="g-inp" />
-          </div>
-          <div class="flex justify-end gap-2 pt-1">
-            <button type="button" id="b-cancel-edit" class="hidden text-xs font-semibold px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600">Batal Edit</button>
-            <button type="reset" id="b-reset" class="text-xs font-semibold px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600">Bersihkan</button>
-            <button type="submit" id="b-submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2 rounded-xl">Simpan Transaksi</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- transactions -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <p class="text-xs font-bold text-slate-400 uppercase tracking-wider px-5 pt-4">🧾 Transaksi Bulan Ini</p>
-      ${items.length === 0
-        ? `<div class="text-center py-12">
-            <p class="text-5xl mb-3">💰</p>
-            <p class="font-semibold text-slate-700">Belum ada transaksi bulan ini</p>
-            <p class="text-xs text-slate-400 mt-1">Catat pemasukan & pengeluaran kos-mu lewat form "Tambah Cepat" di atas.</p>
-           </div>`
-        : `<div class="p-3">
-            ${items.map(i => {
-              const cat = CATS.includes(i.category) ? i.category : 'lainnya';
-              const isInc = i.item_type === 'income';
-              return `<div class="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-slate-50 border-b border-slate-50 last:border-0">
-                <span class="w-9 h-9 shrink-0 rounded-xl ${isInc ? 'bg-emerald-50' : 'bg-slate-50'} flex items-center justify-center text-base">${isInc ? '💼' : CAT_META[cat].icon}</span>
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-semibold text-slate-800 truncate">${esc(i.title)}</p>
-                  <p class="text-[11px] text-slate-400">${isInc ? 'Pemasukan' : `${CAT_META[cat].icon} ${CAT_META[cat].label}`} · ${fmtDate(i.occurred_at)}</p>
-                </div>
-                <span class="text-sm font-bold ${isInc ? 'text-emerald-600' : 'text-slate-700'} whitespace-nowrap">${isInc ? '+' : ''}${fmtIDR(i.amount)}</span>
-                <button class="b-edit text-slate-300 hover:text-indigo-600 px-1" data-id="${i.id}" title="Ubah">✏️</button>
-                <button class="b-del text-slate-300 hover:text-rose-600 px-1" data-id="${i.id}" title="Hapus">🗑</button>
-              </div>`;
-            }).join('')}
-           </div>`}
-    </div>
-  </div>`;
-
-  /* --- wire events --- */
-  const formTitle = body.querySelector('#b-form-title');
-  const editIdEl = body.querySelector('#b-edit-id');
-  const cancelEditBtn = body.querySelector('#b-cancel-edit');
-  const resetBtn = body.querySelector('#b-reset');
-  const submitBtn = body.querySelector('#b-submit');
-
-  function clearBudgetEditMode() {
-    editIdEl.value = '';
-    formTitle.textContent = '➕ Tambah Cepat';
-    submitBtn.textContent = 'Simpan Transaksi';
-    cancelEditBtn.classList.add('hidden');
-    resetBtn.classList.remove('hidden');
-  }
-
-  function fillBudgetForm(item) {
-    editIdEl.value = String(item.id);
-    body.querySelector('#b-title').value = item.title || '';
-    body.querySelector('#b-cat').value = CATS.includes(item.category) ? item.category : 'lainnya';
-    body.querySelector('#b-type').value = item.item_type === 'income' ? 'income' : 'expense';
-    body.querySelector('#b-amount').value = item.amount ?? '';
-    body.querySelector('#b-date').value = item.occurred_at || todayISO();
-    formTitle.textContent = '✏️ Ubah Transaksi';
-    submitBtn.textContent = 'Simpan Perubahan';
-    cancelEditBtn.classList.remove('hidden');
-    resetBtn.classList.add('hidden');
-    body.querySelector('#b-title').focus();
-  }
-
-  body.querySelector('#b-month').addEventListener('change', e => {
-    budgetMonth = e.target.value || currentMonth();
-    drawBudget(body, ctx);
-  });
-
-  cancelEditBtn.addEventListener('click', () => {
-    body.querySelector('#b-add').reset();
-    body.querySelector('#b-date').value = todayISO();
-    clearBudgetEditMode();
-  });
-
-  body.querySelector('#b-add').addEventListener('reset', () => {
-    clearBudgetEditMode();
-    setTimeout(() => { body.querySelector('#b-date').value = todayISO(); }, 0);
-  });
-
-  body.querySelector('#b-add').addEventListener('submit', async e => {
-    e.preventDefault();
-    const payload = {
-      title: body.querySelector('#b-title').value.trim(),
-      category: body.querySelector('#b-cat').value,
-      item_type: body.querySelector('#b-type').value,
-      amount: parseFloat(body.querySelector('#b-amount').value),
-      occurred_at: body.querySelector('#b-date').value || todayISO()
-    };
-    if (!payload.title || !(payload.amount >= 0) || Number.isNaN(payload.amount)) {
-      toast('Judul dan nominal wajib diisi.', 'warn');
-      return;
-    }
-    const editId = editIdEl.value;
-    try {
-      if (editId) {
-        await api.put(`/api/life/budget/${editId}`, payload);
-        toast('Transaksi diperbarui');
-      } else {
-        await api.post('/api/life/budget', payload);
-        toast(payload.item_type === 'income' ? 'Pemasukan tercatat! 💼' : 'Pengeluaran tercatat! 🧾');
-      }
-      drawBudget(body, ctx);
-    } catch (err) { toast(err.message, 'error'); }
-  });
-
-  body.querySelectorAll('.b-edit').forEach(b => b.addEventListener('click', () => {
-    const item = items.find(x => String(x.id) === String(b.dataset.id));
-    if (item) fillBudgetForm(item);
-  }));
-
-  body.querySelectorAll('.b-del').forEach(b => b.addEventListener('click', async () => {
-    if (!confirm('Hapus transaksi ini?')) return;
-    try {
-      await api.del(`/api/life/budget/${b.dataset.id}`);
-      toast('Transaksi dihapus', 'info');
-      drawBudget(body, ctx);
-    } catch (err) { toast(err.message, 'error'); }
-  }));
+  if (active === 'portfolio') await drawPortfolio(body, ctx);
+  else await drawSkripsi(body, ctx);
 }
 
 /* ================================================================ */
@@ -620,7 +370,7 @@ async function drawPortfolio(body, ctx) {
     pFormTitle.textContent = '✏️ Ubah Item';
     pSubmit.textContent = 'Simpan Perubahan';
     pCancel.classList.remove('hidden');
-    body.querySelector('#p-title').focus();
+    body.queryencer('#p-title').focus();
   }
 
   pCancel.addEventListener('click', () => {
@@ -754,5 +504,3 @@ function injectStyles() {
   .g-inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px #e0e7ff}`;
   document.head.appendChild(s);
 }
-
-export default { render, subtitle };

@@ -117,7 +117,6 @@ export const routes = {
   toolkit:      { module: '/js/views/toolkit.js',    group: 'Toolkit CS', icon: '🛠️', label: 'CS Math Toolkit' },
   discrete:     { module: '/js/views/discrete.js',   group: 'Toolkit CS', icon: '🔗', label: 'Matematika Diskrit' },
   devtools:     { module: '/js/views/devtools.js',   group: 'Toolkit CS', icon: '💻', label: 'Dev Tools' },
-  budget:       { module: '/js/views/life.js',       group: 'Kehidupan', icon: '💰', label: 'Budget Kos' },
   skripsi:      { module: '/js/views/life.js',       group: 'Kehidupan', icon: '📗', label: 'Skripsi' },
   portfolio:    { module: '/js/views/life.js',       group: 'Kehidupan', icon: '🏅', label: 'Portofolio & CV' },
   profile:      { module: '/js/views/profile.js',    group: null,  icon: '⚙️', label: 'Pengaturan Akun' },

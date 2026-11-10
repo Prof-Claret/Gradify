@@ -195,4 +195,131 @@ pre code {
     padding: 0.5rem 0.7rem;
     font-size: 0.8rem;
   }
+
+  /* Better stat card layout on mobile */
+  #stat-cards {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.75rem !important;
+  }
+  #stat-cards > div {
+    padding: 0.75rem !important;
+  }
+  #stat-cards p.text-2xl, #stat-cards p.text-lg {
+    font-size: 1.25rem !important;
+  }
+
+  /* Task filter buttons - horizontal scroll with gradient fade */
+  #task-filters {
+    scroll-snap-type: x mandatory;
+    padding-bottom: 0.25rem;
+  }
+  .f-btn {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+
+  /* Hero greeting more compact on mobile */
+  .bg-gradient-to-r.from-indigo-700 {
+    padding: 1rem !important;
+  }
+  .bg-gradient-to-r.from-indigo-700 h2 {
+    font-size: 1.25rem !important;
+  }
+
+  /* Today class cards more compact */
+  .lg\:col-span-2 > div.space-y-2 > div {
+    padding: 0.5rem !important;
+  }
+  .lg\:col-span-2 .text-xs {
+    font-size: 0.7rem;
+  }
+
+  /* Form grids stack on mobile */
+  .grid.md\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Profile form cards */
+  .grid.lg\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Dashboard grid on mobile */
+  .grid.lg\:grid-cols-3,
+  .grid.lg\:grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Better button sizing on mobile */
+  button:not(.nav-item):not(.bnav-btn):not(.f-btn):not(.t-done):not(.tw-done) {
+    min-height: 44px;
+  }
+
+  /* Avatar picker buttons */
+  #pick-avatar button,
+  #pf-avatars button {
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+    font-size: 1.1rem !important;
+  }
+
+  /* Card preview in profile */
+  #pf-avatar-preview-box {
+    width: 5rem !important;
+    height: 5rem !important;
+  }
+
+  /* Student card preview */
+  .ktm-card-preview {
+    transform: scale(0.7);
+    transform-origin: top center;
+    width: 100% !important;
+  }
+}
+
+/* Small mobile adjustments (375px and below) */
+@media (max-width: 375px) {
+  .f-btn {
+    font-size: 10px;
+    padding: 0.2rem 0.5rem;
+  }
+  
+  #mobile-bottom-nav .bnav-btn span:last-child {
+    font-size: 9px;
+  }
+  
+  /* Compact sidebar nav items */
+  .nav-item {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  #sidebar, #mobile-bottom-nav, #btn-mobile-menu, #sidebar-backdrop, header, #global-announcement {
+    display: none !important;
+  }
+  #main-content {
+    padding: 0 !important;
+  }
+  .bg-white, .a-card {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+  }
 }

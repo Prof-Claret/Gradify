@@ -13,17 +13,17 @@ export const PRIORITY = {
 };
 
 export async function render(main, ctx) {
-  const { api, toast, navigate } = ctx;
+  const { api, toast, navigate, user } = ctx;
 
   /* ---- fetch all data in parallel ---- */
-  const [transcript, activeCoursesData, tasksUp, budget] = await Promise.all([
+  const [transcript, activeCoursesData, tasksUp] = await Promise.all([
     api.get('/api/academics/transcript'),
     api.get('/api/academics/courses'),
-    api.get('/api/academics/tasks?scope=upcoming'),
-    api.get('/api/life/budget').catch(() => ({ totals: { balance: 0 } }))
+    api.get('/api/academics/tasks?scope=upcoming')
   ]);
 
   const activeCourses = activeCoursesData.courses || [];
+  const hasAnyData = activeCourses.length > 0 || (tasksUp.tasks?.length || 0) > 0 || (transcript.summary?.total_sks_taken || 0) > 0;
 
   const { summary, target_gpa } = transcript;
   const pending = (tasksUp.tasks || []).slice(0, 6);
@@ -31,13 +31,24 @@ export async function render(main, ctx) {
   const todayClass = activeCourses.filter(c => c.day === todayName);
 
   main.innerHTML = `
-  <!-- Hero greeting -->
-  <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 rounded-2xl p-4 sm:p-6 text-white mb-6 shadow-lg">
-    <div class="flex flex-wrap items-center justify-between gap-4">
+  <!-- Hero greeting with feature highlights for new users -->
+  <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 rounded-2xl p-4 sm:p-6 text-white mb-6 shadow-lg relative overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-br from-indigo-800/30 to-transparent"></div>
+    <div class="relative flex flex-wrap items-center justify-between gap-4">
       <div>
         <p class="text-indigo-200 text-xs sm:text-sm">${esc(todayName)}, ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-        <h2 class="text-xl sm:text-2xl font-extrabold mt-1">Halo, ${esc(ctx.user.full_name.split(' ')[0])}! 👋</h2>
-        <p class="text-indigo-100 text-xs sm:text-sm mt-1">${esc(ctx.user.faculty || '')} · Semester ${ctx.user.active_semester} · Target IPK ${target_gpa}</p>
+        <h2 class="text-xl sm:text-2xl font-extrabold mt-1">Halo, ${esc(user.full_name.split(' ')[0])}! 👋</h2>
+        <p class="text-indigo-100 text-xs sm:text-sm mt-1">${esc(user.faculty || '')} · Semester ${user.active_semester} · Target IPK ${target_gpa}</p>
+        ${!hasAnyData ? `
+        <div class="mt-3 pt-3 border-t border-white/20">
+          <p class="text-indigo-100 text-xs sm:text-sm">🚀 <strong>Mulai perjalanan akademikmu:</strong></p>
+          <div class="flex flex-wrap gap-2 mt-2 text-[11px] sm:text-xs">
+            <span class="bg-white/15 px-2 py-1 rounded-full">📚 Tambah Mata Kuliah</span>
+            <span class="bg-white/15 px-2 py-1 rounded-full">📝 Buat Catatan</span>
+            <span class="bg-white/15 px-2 py-1 rounded-full">📋 Tambah Tugas</span>
+            <span class="bg-white/15 px-2 py-1 rounded-full">🎯 Atur Target IPK</span>
+          </div>
+        </div>` : ''}
       </div>
       <div class="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
         <button id="q-add-task" class="flex-1 sm:flex-none text-center bg-white/15 hover:bg-white/25 backdrop-blur px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition">+ Tugas Baru</button>
@@ -47,11 +58,10 @@ export async function render(main, ctx) {
   </div>
 
   <!-- Stat cards -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" id="stat-cards">
+  <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6" id="stat-cards">
     ${statCard('IPK Kumulatif', summary.ipk.toFixed(2) || '-', `Predikat: ${summary.predikat}`, '🎯', summary.ipk >= (target_gpa - 0.3) ? 'text-emerald-600' : 'text-rose-600')}
     ${statCard('Sudah Dinilai', `${summary.total_sks_graded} SKS`, `Take: ${summary.total_sks_taken} SKS`, '📋', 'text-indigo-600')}
     ${statCard('Maks SKS Berikutnya', `${summary.max_sks_next} SKS`, 'Sesuai regulasi IPS', '⚖️', 'text-indigo-600')}
-    ${statCard('Saldo Budget Bulan Ini', fmtIDR(budget.totals?.balance || 0), 'Kos & harian', '💰', (budget.totals?.balance || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600')}
   </div>
 
   <div class="grid lg:grid-cols-3 gap-6 mb-6">

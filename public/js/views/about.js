@@ -9,7 +9,7 @@ const FEATURES = [
   ['Phase 0', 'Registrasi Wizard & Profil Akademik', 'Onboarding 3 langkah, preset 8 fakultas UNIKA UST, mode kampus custom, hub identitas.'],
   ['Phase 1', 'Semester & Mata Kuliah', 'Kelola semester 1–8+, semester switcher, arsip/transkrip, transition wizard, kalkulator SKS, CRD/CRUD matkul, dashboard tugas, catatan CS Markdown.'],
   ['Phase 2', 'Toolkit CS', 'Kalkulator ilmiah + palet simbol Yunani, sistem bilangan, matriks (det/adj/OBE), kalkulus, statistika, Matematika Diskrit lengkap, SQL builder, regex tester, subnet/CIDR, Big-O reference.'],
-  ['Phase 3', 'GPA & Kehidupan', 'Transkrip + IPK, simulator Cum Laude, pelacak milestone skripsi, budget kos, auto-builder portofolio & CV.']
+  ['Phase 3', 'GPA & Kehidupan', 'Transkrip + IPK, simulator Cum Laude, pelacak milestone skripsi, auto-builder portofolio & CV.']
 ];
 
 export function render(main, ctx) {
@@ -23,7 +23,7 @@ export function render(main, ctx) {
         <h2 class="text-2xl font-extrabold mt-2">Gradify</h2>
         <p class="text-indigo-200 italic mt-1">Simplify Your Academic Journey</p>
         <div class="inline-flex items-center gap-2 mt-3 bg-white/15 backdrop-blur rounded-full px-4 py-1.5 text-xs font-semibold">
-          v1.0.0 — Beta Release
+          v1.0.0 — Stable Release
         </div>
       </div>
       <div class="p-6">
