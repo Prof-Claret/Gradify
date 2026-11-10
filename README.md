@@ -18,6 +18,7 @@ Gradify adalah aplikasi akademik all-in-one untuk mahasiswa yang menggabungkan p
 - CRUD mata kuliah beserta kode, SKS, jadwal, ruangan, dosen, dan nilai.
 - Pelacak tugas dengan jenis, prioritas, tenggat waktu, dan status.
 - Transkrip akademik, perhitungan IPS, IPK, serta simulasi target IPK.
+- Kartu mahasiswa (KTM) digital ukuran CR80 dengan barcode Code 39, kode verifikasi, mode cetak dua sisi, dan ekspor PNG 300 DPI.
 - Kalkulator batas maksimal SKS berdasarkan IPS.
 
 ### Catatan dan Kehidupan Mahasiswa
@@ -28,6 +29,17 @@ Gradify adalah aplikasi akademik all-in-one untuk mahasiswa yang menggabungkan p
 - Pencatatan pemasukan dan pengeluaran mahasiswa.
 - Pelacak milestone skripsi/final project.
 - Penyimpanan item portfolio atau pencapaian mahasiswa.
+
+### Dashboard Admin
+
+- Halaman admin terpisah di `/admin` dengan autentikasi khusus administrator.
+- Setup administrator pertama melalui halaman awal dashboard.
+- Manajemen pengguna: pencarian, edit profil, ubah role admin, reset password, dan hapus akun.
+- Statistik website, pengguna aktif, aktivitas terbaru, dan informasi sistem.
+- Pengaturan situs: nama, tagline, email dukungan, pengumuman global, registrasi, kampus custom, dan target IPK default.
+- Mode pemeliharaan dengan pesan khusus; dashboard admin tetap dapat diakses.
+- Backup database ke JSON atau SQLite, restore dari file `.json`, `.db`, atau `.sqlite`, serta backup otomatis sebelum import.
+- Optimasi database dengan `VACUUM` dan pengelolaan backup otomatis.
 
 ## Teknologi
 
@@ -80,15 +92,37 @@ data/gradify.db
 5. Kelola semester dan mata kuliah dari menu akademik.
 6. Tambahkan tugas, nilai, catatan, transaksi, milestone skripsi, dan portfolio dari menu terkait.
 
+## Dashboard Admin
+
+Buka `http://localhost:3000/admin`. Saat belum ada administrator, dashboard akan menampilkan form **Setup Administrator Pertama**. Buat akun admin dengan password minimal 8 karakter, lalu gunakan akun tersebut untuk login.
+
+> [!IMPORTANT]
+> Form setup admin hanya terbuka ketika belum ada akun administrator. Setelah admin pertama dibuat, form tersebut terkunci. Segera lakukan setup setelah deployment pertama.
+
+Fitur utama dashboard:
+
+- **Dashboard** — ringkasan pengguna, mata kuliah, tugas, ukuran database, statistik tabel, dan informasi sistem.
+- **Pengguna** — cari dan edit profil mahasiswa, jadikan administrator, reset password, atau hapus akun beserta datanya.
+- **Backup & Restore** — ekspor database ke JSON/SQLite, import backup, unduh backup otomatis, dan jalankan `VACUUM`.
+- **Pengaturan** — identitas situs, email dukungan, pengumuman global, registrasi, kampus custom, target IPK default, serta mode pemeliharaan.
+
+Catatan keamanan backup:
+
+- File backup berisi akun dan hash password. Simpan di tempat aman dan jangan dibagikan.
+- Backup database tidak menyertakan file avatar di `data/uploads`. Salin folder tersebut secara terpisah jika ingin memindahkan seluruh aset.
+- Import akan mengganti seluruh data, membuat backup otomatis di `data/backups/`, dan menghentikan semua sesi login.
+
 ## API Utama
 
 | Kelompok | Path | Keterangan |
 | --- | --- | --- |
 | Kesehatan | `GET /api/health` | Status aplikasi dan versi |
+| Konfigurasi | `GET /api/config` | Branding, registrasi, pengumuman, dan mode pemeliharaan publik |
 | Autentikasi | `/api/auth/*` | Registrasi, login, profil, logout, dan preset kampus |
-| Akademik | `/api/academics/*` | Semester, mata kuliah, tugas, dan transkrip |
+| Akademik | `/api/academics/*` | Semester, mata kuliah, tugas, transkrip, dan data kartu mahasiswa |
 | Catatan | `/api/notes/*` | Daftar, pembuatan, pembaruan, dan penghapusan catatan |
 | Kehidupan | `/api/life/*` | Anggaran, skripsi, dan portfolio |
+| Admin | `/api/admin/*` | Setup/login admin, statistik, pengguna, pengaturan, dan backup/restore |
 
 Contoh pemeriksaan kesehatan aplikasi:
 
@@ -103,6 +137,10 @@ Gradify/
 ├── public/
 │   ├── index.html
 │   ├── css/style.css
+│   ├── admin/
+│   │   ├── index.html
+│   │   ├── admin.css
+│   │   └── admin.js
 │   └── js/
 │       ├── app.js
 │       ├── api.js
@@ -110,7 +148,11 @@ Gradify/
 ├── server/
 │   ├── index.js
 │   ├── db.js
-│   └── routes/
+│   ├── routes/
+│   │   └── admin.js
+│   └── utils/
+│       └── settings.js
+├── test/
 ├── data/
 ├── PRD.md
 └── package.json

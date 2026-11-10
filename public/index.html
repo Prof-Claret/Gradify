@@ -25,7 +25,7 @@
 
   <!-- Markdown + Syntax highlighting (Catatan Perkuliahan CS) -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css" crossorigin="anonymous" />
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/highlight.min.js"></script>
 
   <!-- MathJax LaTeX Renderer -->
@@ -35,7 +35,7 @@
   <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" crossorigin="anonymous" />
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>" />
 </head>
@@ -44,8 +44,8 @@
   <!-- Splash -->
   <div id="splash" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-700 text-white">
     <div class="text-6xl mb-4 animate-bounce">🎓</div>
-    <h1 class="text-3xl font-extrabold tracking-tight">Gradify</h1>
-    <p class="mt-2 text-indigo-200 italic">Simplify Your Academic Journey</p>
+    <h1 id="splash-name" class="text-3xl font-extrabold tracking-tight">Gradify</h1>
+    <p id="splash-tagline" class="mt-2 text-indigo-200 italic">Simplify Your Academic Journey</p>
   </div>
 
   <!-- Auth overlay (login/register) -->
@@ -60,7 +60,7 @@
         <div class="flex items-center gap-3">
           <span class="text-2xl">🎓</span>
           <div>
-            <p class="text-white font-bold leading-tight">Gradify</p>
+            <p id="brand-name" class="text-white font-bold leading-tight">Gradify</p>
             <p class="text-[10px] text-indigo-400 tracking-widest uppercase">v1.0.0 Beta</p>
           </div>
         </div>
@@ -85,6 +85,7 @@
         <select id="semester-switcher" class="text-xs sm:text-sm border border-slate-300 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 bg-white max-w-[125px] sm:max-w-[200px] truncate outline-none focus:ring-2 focus:ring-indigo-300" title="Semester Switcher"></select>
         <div id="topbar-avatar" class="shrink-0 cursor-pointer"></div>
       </header>
+      <div id="global-announcement" class="hidden mx-3.5 sm:mx-5 lg:mx-8 mt-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 px-4 py-3 text-sm shadow-sm"></div>
       <div id="main-content" class="flex-1 p-3.5 sm:p-5 lg:p-8 pb-24 lg:pb-8"></div>
     </main>
 

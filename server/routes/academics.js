@@ -2,11 +2,16 @@
  * Gradify Academic Routes — Semesters, Courses, Tasks, Transcript
  */
 const express = require('express');
+const crypto = require('node:crypto');
 const { db, computeIps, maxSksForIps, gradeToPoint } = require('../db');
 const { requireAuth } = require('./auth');
 
 const router = express.Router();
 router.use(requireAuth);
+
+/* Secret used to derive a stable KTM verification code.
+ * Set GRADIFY_CARD_SECRET in production to keep codes unguessable. */
+const CARD_SECRET = process.env.GRADIFY_CARD_SECRET || 'gradify-ktm-v1';
 
 function clampWeight(v, fallback) {
   const n = parseInt(v, 10);
@@ -230,8 +235,8 @@ router.delete('/tasks/:id', (req, res) => {
  * ============================================================ */
 
 // GET /api/academics/transcript — per-semester breakdown + cumulative IPK
-router.get('/transcript', (req, res) => {
-  const sems = db.prepare('SELECT * FROM semesters WHERE user_id = ? ORDER BY semester_number').all(req.user.id);
+function buildTranscript(userId) {
+  const sems = db.prepare('SELECT * FROM semesters WHERE user_id = ? ORDER BY semester_number').all(userId);
   const courseStmt = db.prepare('SELECT * FROM courses WHERE semester_id = ? ORDER BY course_code');
 
   let cumPoints = 0, cumSks = 0;
@@ -255,16 +260,91 @@ router.get('/transcript', (req, res) => {
   });
 
   const ipk = cumSks > 0 ? +(cumPoints / cumSks).toFixed(2) : 0;
-  res.json({
-    transcript: rows,
+  return {
+    rows,
     summary: {
       ipk,
       total_sks_taken: rows.reduce((a, r) => a + r.total_sks, 0),
       total_sks_graded: cumSks,
       max_sks_next: maxSksForIps(ipk),
       predikat: ipk >= 3.5 ? 'Cum Laude (Sangat Memuaskan)' : ipk >= 3.0 ? 'Memuaskan' : ipk >= 2.0 ? 'Cukup' : 'Perlu Peningkatan'
+    }
+  };
+}
+
+router.get('/transcript', (req, res) => {
+  const { rows, summary } = buildTranscript(req.user.id);
+  res.json({ transcript: rows, summary, target_gpa: req.user.target_gpa });
+});
+
+/* ============================================================
+ * STUDENT ID CARD (KTM) — printable identity data
+ * ============================================================ */
+
+function computeCardValidity(user) {
+  const graduationYear = parseInt(user.expected_graduation_year, 10);
+  if (Number.isFinite(graduationYear) && graduationYear > 0) {
+    return `${graduationYear}-08-31`;
+  }
+
+  // Fallback: normal S1 duration = 8 semesters, counted from current semester.
+  const activeSemester = parseInt(user.active_semester, 10) || 1;
+  const remainingSemesters = Math.max(8 - activeSemester, 0);
+  const yearsLeft = Math.max(1, Math.ceil((remainingSemesters + 1) / 2));
+  const now = new Date();
+  const academicYearStart = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${academicYearStart + yearsLeft}-08-31`;
+}
+
+function buildVerificationCode(user, cardNumber) {
+  return crypto
+    .createHmac('sha256', CARD_SECRET)
+    .update(`${user.id}|${cardNumber}|${user.email}`)
+    .digest('hex')
+    .slice(0, 12)
+    .toUpperCase()
+    .match(/.{1,4}/g)
+    .join('-');
+}
+
+function todayLocalIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// GET /api/academics/student-card — data for previewing & printing a KTM
+router.get('/student-card', (req, res) => {
+  const user = req.user;
+  const { summary } = buildTranscript(user.id);
+  const activeSemester = db.prepare(
+    'SELECT academic_year FROM semesters WHERE user_id = ? AND is_active = 1 ORDER BY semester_number DESC LIMIT 1'
+  ).get(user.id);
+
+  const npm = (user.npm_nim || '').trim();
+  const cardNumber = npm || `GRD-${String(user.id).padStart(6, '0')}`;
+  const today = todayLocalIso();
+
+  res.json({
+    card_number: cardNumber,
+    verification_code: buildVerificationCode(user, cardNumber),
+    issued_at: (user.created_at || today).slice(0, 10),
+    printed_at: today,
+    valid_until: computeCardValidity(user),
+    card_version: 'KTM-1.0',
+    student: {
+      full_name: user.full_name,
+      npm_nim: npm || null,
+      avatar_emoji: user.avatar_emoji || '🎓',
+      avatar_url: user.avatar_url || null,
+      faculty: user.faculty || null,
+      study_program: user.study_program || null,
+      campus_name: user.campus_name || 'Universitas Katolik Santo Thomas (UNIKA UST)',
+      active_semester: user.active_semester
     },
-    target_gpa: req.user.target_gpa
+    academic: {
+      ...summary,
+      academic_year: activeSemester?.academic_year || null
+    }
   });
 });
 

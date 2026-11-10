@@ -157,6 +157,23 @@ export async function render(main, ctx) {
         </div>
       </div>
 
+      <!-- Student ID Card shortcut -->
+      <div class="bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 rounded-2xl border border-indigo-500/30 shadow-sm p-5 text-white">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="font-bold flex items-center gap-2">🪪 Kartu Mahasiswa</h3>
+            <p class="text-xs text-indigo-100 mt-1">
+              Pratinjau dan cetak KTM ukuran CR80 lengkap dengan foto, barcode, kode verifikasi, serta unduhan PNG 300 DPI.
+            </p>
+            ${!u.npm_nim ? `<p class="text-[11px] bg-white/15 border border-white/25 rounded-lg px-2.5 py-1.5 mt-2">⚠️ Isi NPM/NIM terlebih dahulu agar nomor kartu sesuai identitas kampus.</p>` : ''}
+          </div>
+          <span class="text-3xl shrink-0">🪪</span>
+        </div>
+        <button id="pf-open-card" class="mt-3 w-full bg-white text-indigo-700 hover:bg-indigo-50 font-bold py-2 rounded-xl text-sm transition">
+          Pratinjau & Cetak KTM →
+        </button>
+      </div>
+
       <!-- Account Security -->
       <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
         <h3 class="font-bold text-slate-800 mb-3">🔒 Keamanan Akun</h3>
@@ -337,6 +354,8 @@ export async function render(main, ctx) {
       e.target.reset();
     } catch (err) { toast(err.message, 'error'); }
   });
+
+  document.getElementById('pf-open-card')?.addEventListener('click', () => ctx.navigate('student-card'));
 
   document.getElementById('pf-logout').addEventListener('click', async () => {
     if (!confirm('Logout dari Gradify?')) return;

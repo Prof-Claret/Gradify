@@ -9,9 +9,15 @@ const fs = require('node:fs');
 const DATA_DIR = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const db = new DatabaseSync(path.join(DATA_DIR, 'gradify.db'));
+const DB_PATH = process.env.GRADIFY_DB_PATH
+  ? path.resolve(process.env.GRADIFY_DB_PATH)
+  : path.join(DATA_DIR, 'gradify.db');
+if (!fs.existsSync(path.dirname(DB_PATH))) fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+
+const db = new DatabaseSync(DB_PATH);
 db.exec('PRAGMA journal_mode = WAL;');
 db.exec('PRAGMA foreign_keys = ON;');
+db.exec('PRAGMA busy_timeout = 5000;');
 
 /* ============================================================
  * SCHEMA
@@ -130,6 +136,12 @@ CREATE TABLE IF NOT EXISTS portfolio_items (
   year TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
 `);
 
 /* Migrate existing DBs that predate grading weight columns */
@@ -144,6 +156,26 @@ ensureColumn('courses', 'weight_uts', 'INTEGER DEFAULT 30');
 ensureColumn('courses', 'weight_uas', 'INTEGER DEFAULT 40');
 ensureColumn('courses', 'weight_lain', 'INTEGER DEFAULT 10');
 ensureColumn('users', 'avatar_url', 'TEXT');
+ensureColumn('users', 'is_admin', 'INTEGER DEFAULT 0');
+
+/* ============================================================
+ * APP SETTINGS (admin dashboard)
+ * ============================================================ */
+const DEFAULT_APP_SETTINGS = {
+  site_name: 'Gradify',
+  site_tagline: 'Simplify Your Academic Journey',
+  support_email: 'support@gradify.local',
+  registration_enabled: '1',
+  maintenance_mode: '0',
+  maintenance_message: 'Gradify sedang dalam perbaikan. Silakan kembali beberapa saat lagi.',
+  allow_custom_campus: '1',
+  default_target_gpa: '3.50',
+  announcement: ''
+};
+
+for (const [key, value] of Object.entries(DEFAULT_APP_SETTINGS)) {
+  db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)').run(key, value);
+}
 
 /* ============================================================
  * GRADE POINT SCALE (UNIKA UST standard 4.00 scale)
@@ -222,6 +254,8 @@ function computeIps(courses) {
 
 module.exports = {
   db,
+  DB_PATH,
+  DEFAULT_APP_SETTINGS,
   GRADE_POINTS,
   UNIKA_UST_PRESET,
   gradeToPoint,

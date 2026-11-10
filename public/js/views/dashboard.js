@@ -116,8 +116,8 @@ export async function render(main, ctx) {
   </section>`;
 
   addStyles();
-  loadTasks('all');
   wireEvents(api, toast, navigate, ctx);
+  loadTasks('all');
 
   function statCard(label, value, sub, icon, valCls) {
     return `<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 sm:p-4">

@@ -4,6 +4,7 @@
 const express = require('express');
 const crypto = require('node:crypto');
 const { db, UNIKA_UST_PRESET } = require('../db');
+const { getSetting } = require('../utils/settings');
 const {
   checkAvatarRateLimit,
   handleAvatarUploadMiddleware,
@@ -64,10 +65,14 @@ router.get('/presets', (req, res) => {
 
 /* ---------- POST /api/auth/register ---------- */
 router.post('/register', (req, res) => {
+  if (getSetting('registration_enabled', '1') !== '1') {
+    return res.status(403).json({ error: 'Registrasi akun baru sedang dinonaktifkan oleh administrator.' });
+  }
+
   const {
     email, password, full_name, avatar_emoji = '🎓', npm_nim,
     campus_mode = 'preset', campus_name, faculty, study_program,
-    active_semester = 1, target_gpa = 3.5, expected_graduation_year
+    active_semester = 1, target_gpa, expected_graduation_year
   } = req.body;
 
   if (!email || !password || !full_name) {
@@ -75,6 +80,10 @@ router.post('/register', (req, res) => {
   }
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password minimal 6 karakter.' });
+  }
+
+  if (campus_mode !== 'preset' && getSetting('allow_custom_campus', '1') !== '1') {
+    return res.status(403).json({ error: 'Pendaftaran kampus custom sedang dinonaktifkan oleh administrator.' });
   }
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
@@ -109,7 +118,7 @@ router.post('/register', (req, res) => {
     campus_mode === 'preset' ? faculty : campus_name ? '' : faculty || null,
     campus_mode === 'preset' ? study_program : null,
     Math.min(Math.max(parseInt(active_semester) || 1, 1), 9),
-    parseFloat(target_gpa) || 3.5,
+    parseFloat(target_gpa) || parseFloat(getSetting('default_target_gpa', '3.50')) || 3.5,
     expected_graduation_year ? parseInt(expected_graduation_year) : null
   );
 
@@ -296,4 +305,10 @@ router.delete('/avatar', requireAuth, (req, res) => {
   });
 });
 
-module.exports = { router, requireAuth };
+module.exports = {
+  router,
+  requireAuth,
+  hashPassword,
+  createSession,
+  publicUser
+};

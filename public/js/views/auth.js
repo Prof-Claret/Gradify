@@ -6,6 +6,12 @@ export const steps_meta = ['Identitas', 'Kampus', 'Akademik'];
 
 export function render(box, ctx) {
   const { api, esc, toast } = ctx;
+  const config = ctx.config || {};
+  const siteName = config.site_name || 'Gradify';
+  const siteTagline = config.site_tagline || 'Simplify Your Academic Journey';
+  const registrationOpen = config.registration_enabled !== false;
+  const allowCustomCampus = config.allow_custom_campus !== false;
+  const defaultTargetGpa = Number(config.default_target_gpa) || 3.5;
   let mode = 'login';
   let wizard = { step: 1, data: {} };
 
@@ -16,8 +22,8 @@ export function render(box, ctx) {
       <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden mx-auto">
         <div class="bg-gradient-to-r from-indigo-700 to-violet-700 text-white p-6 sm:p-8 text-center">
           <div class="text-4xl sm:text-5xl mb-2">🎓</div>
-          <h1 class="text-2xl font-extrabold">Gradify</h1>
-          <p class="text-indigo-200 text-xs sm:text-sm italic mt-1">Simplify Your Academic Journey</p>
+          <h1 class="text-2xl font-extrabold">${esc(siteName)}</h1>
+          <p class="text-indigo-200 text-xs sm:text-sm italic mt-1">${esc(siteTagline)}</p>
         </div>
         <div class="p-5 sm:p-8 space-y-4">
           <div>
@@ -33,8 +39,16 @@ export function render(box, ctx) {
           <p class="text-xs text-slate-400 text-center">
             <span title="Butuh kredensial provider — rencana v1.1" class="cursor-help">🔒 Google OAuth & Apple ID tersedia di v1.1</span>
           </p>
-          <p class="text-sm text-center text-slate-500">Belum punya akun?
-            <button id="go-register" class="text-indigo-600 font-semibold hover:underline">Daftar Sekarang</button></p>
+          ${registrationOpen ? `
+            <p class="text-sm text-center text-slate-500">Belum punya akun?
+              <button id="go-register" class="text-indigo-600 font-semibold hover:underline">Daftar Sekarang</button></p>
+          ` : `
+            <p class="text-xs text-center bg-slate-50 border border-slate-200 text-slate-500 rounded-xl p-3">Pendaftaran akun baru sedang ditutup oleh administrator.</p>
+          `}
+          <p class="text-[11px] text-slate-400 text-center">
+            ${config.support_email ? `Butuh bantuan? <a href="mailto:${esc(config.support_email)}" class="text-indigo-600 hover:underline">${esc(config.support_email)}</a> · ` : ''}
+            <a href="/admin" class="hover:text-indigo-600 hover:underline">🛡️ Dashboard Admin</a>
+          </p>
         </div>
       </div>
     </div>`;
@@ -55,7 +69,12 @@ export function render(box, ctx) {
         errEl.classList.remove('hidden');
       }
     });
-    box.querySelector('#go-register').addEventListener('click', () => { mode = 'register'; wizard = { step: 1, data: {} }; renderWizard(); });
+    box.querySelector('#go-register')?.addEventListener('click', () => {
+      if (!registrationOpen) return toast('Pendaftaran sedang ditutup oleh administrator.', 'warn');
+      mode = 'register';
+      wizard = { step: 1, data: {} };
+      renderWizard();
+    });
   }
 
   /* ================= REGISTRATION WIZARD ================= */
@@ -206,13 +225,15 @@ export function render(box, ctx) {
             <p class="text-xs text-slate-500">Universitas Katolik Santo Thomas Medan — dropdown Fakultas & Prodi otomatis.</p>
           </div>
         </label>
+        ${allowCustomCampus ? `
         <label class="flex items-start gap-3 border-2 border-slate-200 rounded-xl p-4 cursor-pointer" id="opt-custom">
           <input type="radio" name="cmode" class="mt-1 accent-indigo-600" />
           <div>
             <p class="font-semibold text-sm text-slate-800">✏️ Tambah Kampus Baru (Manual Input)</p>
             <p class="text-xs text-slate-500">Alternatif bagi mahasiswa dari universitas lain.</p>
           </div>
-        </label>
+        </label>` : `
+        <p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">Pendaftaran kampus custom sedang dinonaktifkan oleh administrator.</p>`}
       </div>
 
       <div id="campus-fields"></div>
@@ -264,17 +285,18 @@ export function render(box, ctx) {
     }
 
     function setMode(m) {
+      if (!allowCustomCampus) m = 'preset';
       campusMode = m;
       const on = 'border-indigo-500 bg-indigo-50', off = 'border-slate-200';
       optPreset.className = `flex items-start gap-3 border-2 rounded-xl p-4 cursor-pointer ${m === 'preset' ? on : off}`;
-      optCustom.className = `flex items-start gap-3 border-2 rounded-xl p-4 cursor-pointer ${m === 'custom' ? on : off}`;
+      if (optCustom) optCustom.className = `flex items-start gap-3 border-2 rounded-xl p-4 cursor-pointer ${m === 'custom' ? on : off}`;
       optPreset.querySelector('input').checked = m === 'preset';
-      optCustom.querySelector('input').checked = m === 'custom';
+      if (optCustom) optCustom.querySelector('input').checked = m === 'custom';
       m === 'preset' ? drawPreset() : drawCustom();
     }
 
     optPreset.addEventListener('click', () => setMode('preset'));
-    optCustom.addEventListener('click', () => setMode('custom'));
+    optCustom?.addEventListener('click', () => setMode('custom'));
     drawPreset();
 
     body.querySelector('#s2-prev').addEventListener('click', () => { wizard.step = 1; renderWizard(); });
@@ -318,11 +340,15 @@ export function render(box, ctx) {
           <div>
             <label class="text-xs font-semibold text-slate-600 block mb-1">Target IPK / GPA *</label>
             <select id="s3-target" class="g-inp">
-              <option value="3.50">3.50 — Cum Laude</option>
-              <option value="3.00">3.00 — Memuaskan</option>
-              <option value="3.75">3.75 — Sangat Cum Laude</option>
-              <option value="2.50">2.50 — Cukup</option>
-              <option value="4.00">4.00 — Sempurna</option>
+              ${[
+                ['3.50', '3.50 — Cum Laude'],
+                ['3.00', '3.00 — Memuaskan'],
+                ['3.75', '3.75 — Sangat Cum Laude'],
+                ['2.50', '2.50 — Cukup'],
+                ['4.00', '4.00 — Sempurna']
+              ].map(([value, label]) =>
+                `<option value="${value}" ${Math.abs(parseFloat(value) - defaultTargetGpa) < 0.01 ? 'selected' : ''}>${label}</option>`
+              ).join('')}
             </select>
           </div>
         </div>
@@ -342,7 +368,7 @@ export function render(box, ctx) {
       <p id="s3-err" class="text-rose-600 text-xs hidden mt-2"></p>
       <div class="flex justify-between pt-4">
         <button id="s3-prev" class="text-sm text-slate-500 hover:text-slate-800 font-medium">← Kembali</button>
-        <button id="s3-submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm">🚀 Buat Akun Gradify</button>
+        <button id="s3-submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm">🚀 Buat Akun ${esc(siteName)}</button>
       </div>`;
 
     body.querySelector('#s3-prev').addEventListener('click', () => { wizard.step = 2; renderWizard(); });

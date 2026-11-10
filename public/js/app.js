@@ -36,8 +36,74 @@ export function fmtIDR(n) {
 const state = {
   user: null,
   currentRoute: 'dashboard',
-  viewModules: {}
+  viewModules: {},
+  config: {
+    site_name: 'Gradify',
+    site_tagline: 'Simplify Your Academic Journey',
+    support_email: '',
+    registration_enabled: true,
+    maintenance_mode: false,
+    maintenance_message: '',
+    allow_custom_campus: true,
+    default_target_gpa: 3.5,
+    announcement: ''
+  }
 };
+
+/* ---------- site configuration ---------- */
+export async function loadConfig() {
+  try {
+    const res = await fetch('/api/config', { headers: { Accept: 'application/json' } });
+    if (!res.ok) return state.config;
+    const data = await res.json();
+    if (data.config) state.config = { ...state.config, ...data.config };
+  } catch { /* use defaults */ }
+  return state.config;
+}
+
+function applyConfig() {
+  const c = state.config;
+  document.title = `${c.site_name} — ${c.site_tagline}`;
+  const splashName = document.getElementById('splash-name');
+  const splashTagline = document.getElementById('splash-tagline');
+  const brandName = document.getElementById('brand-name');
+  if (splashName) splashName.textContent = c.site_name;
+  if (splashTagline) splashTagline.textContent = c.site_tagline;
+  if (brandName) brandName.textContent = c.site_name;
+
+  const ann = document.getElementById('global-announcement');
+  if (ann) {
+    if (c.announcement) {
+      ann.innerHTML = `<span class="mr-1">📢</span><span class="whitespace-pre-line">${esc(c.announcement)}</span>`;
+      ann.classList.remove('hidden');
+    } else {
+      ann.classList.add('hidden');
+      ann.innerHTML = '';
+    }
+  }
+}
+
+function showMaintenance() {
+  document.getElementById('splash')?.classList.add('hidden');
+  document.getElementById('app-shell')?.classList.add('hidden');
+  const screen = document.getElementById('auth-screen');
+  if (!screen) return;
+  screen.classList.remove('hidden');
+  screen.innerHTML = `
+    <div class="min-h-screen flex items-center justify-center p-4">
+      <div class="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden text-center">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-8">
+          <div class="text-5xl mb-3">🛠️</div>
+          <h1 class="text-2xl font-extrabold">${esc(state.config.site_name)}</h1>
+          <p class="text-amber-100 text-sm mt-1">Mode Pemeliharaan</p>
+        </div>
+        <div class="p-8">
+          <p class="text-slate-700 whitespace-pre-line">${esc(state.config.maintenance_message || 'Website sedang dalam perbaikan. Silakan kembali beberapa saat lagi.')}</p>
+          <a href="/admin" class="inline-block mt-6 text-xs font-semibold text-indigo-600 hover:underline">Masuk Dashboard Admin →</a>
+        </div>
+      </div>
+    </div>`;
+}
 
 /* ---------- route registry ---------- */
 export const routes = {
@@ -46,6 +112,7 @@ export const routes = {
   courses:      { module: '/js/views/courses.js',    group: 'Akademik', icon: '📚', label: 'Mata Kuliah' },
   notes:        { module: '/js/views/notes.js',      group: 'Akademik', icon: '📝', label: 'Catatan CS' },
   gpa:          { module: '/js/views/gpa.js',        group: 'Akademik', icon: '🎯', label: 'IPK & Transkrip' },
+  'student-card': { module: '/js/views/student-card.js', group: 'Akademik', icon: '🪪', label: 'Kartu Mahasiswa' },
   calculator:   { module: '/js/views/calculator.js', group: 'Toolkit CS', icon: '🧮', label: 'Kalkulator Ilmiah' },
   toolkit:      { module: '/js/views/toolkit.js',    group: 'Toolkit CS', icon: '🛠️', label: 'CS Math Toolkit' },
   discrete:     { module: '/js/views/discrete.js',   group: 'Toolkit CS', icon: '🔗', label: 'Matematika Diskrit' },
@@ -88,6 +155,7 @@ const ctx = {
   api, esc, toast, rerenderMath, fmtIDR,
   navigate,
   get user() { return state.user; },
+  get config() { return state.config; },
   get currentRoute() { return state.currentRoute; },
   refresh: () => renderView()
 };
@@ -260,6 +328,7 @@ function showAuth() {
   screen.innerHTML = '<div class="min-h-screen flex items-center justify-center p-4"><div id="auth-box" class="w-full max-w-4xl"></div></div>';
   import('/js/views/auth.js').then(m => m.render(document.getElementById('auth-box'), {
     api, esc, toast,
+    config: state.config,
     onAuthed(token, user) {
       setToken(token);
       state.user = user;
@@ -319,6 +388,12 @@ window.addEventListener('hashchange', () => {
 });
 
 (async function boot() {
+  const config = await loadConfig();
+  applyConfig();
+  if (config.maintenance_mode) {
+    showMaintenance();
+    return;
+  }
   const ok = await tryResumeSession();
   if (ok) showApp();
   else showAuth();
