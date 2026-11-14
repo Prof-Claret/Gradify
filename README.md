@@ -12,8 +12,8 @@ Gradify adalah aplikasi akademik all-in-one untuk mahasiswa yang menggabungkan p
 ### Akademik
 
 - Registrasi dan login dengan profil mahasiswa.
-- Preset UNIKA UST untuk fakultas dan program studi.
-- Dukungan kampus, fakultas, dan prodi custom.
+- Enam kampus default (UNIKA UST, USU, Unimed, UINSU, UMSU, UNPRI) dengan fakultas dan prodi dinamis.
+- Dukungan kampus, fakultas, dan prodi custom; data akademik mahasiswa hanya dapat diubah admin.
 - Pengelolaan semester aktif, tahun akademik, dan arsip semester.
 - CRUD mata kuliah beserta kode, SKS, jadwal, ruangan, dosen, dan nilai.
 - Pelacak tugas dengan jenis, prioritas, tenggat waktu, dan status.
@@ -29,6 +29,16 @@ Gradify adalah aplikasi akademik all-in-one untuk mahasiswa yang menggabungkan p
 - Pencatatan pemasukan dan pengeluaran mahasiswa.
 - Pelacak milestone skripsi/final project.
 - Penyimpanan item portfolio atau pencapaian mahasiswa.
+
+### Toolkit per Prodi
+
+Fitur khusus muncul di sidebar sesuai program studi mahasiswa. Mahasiswa tidak dapat membuka tools prodi lain lewat URL langsung.
+
+- **Toolkit CS** — CS Math Toolkit, Matematika Diskrit, dan Dev Tools (Teknik Informatika, Ilmu Komputer, Sistem Informasi, Teknologi Informasi).
+- **Toolkit Keuangan & Akuntansi** — rasio keuangan, penyusutan, NPV/IRR, BEP, HPP, dan estimasi PPh 21 (Akuntansi, Manajemen, Ekonomi, Perbankan Syariah).
+- **Toolkit Teknik Sipil** — konversi satuan, volume & material beton, berat besi, kemiringan, RAB, dan referensi mutu beton (Teknik Sipil, Arsitektur).
+- **Toolkit Hukum** — kalkulator daluwarsa, tenggat proses, timeline kasus, checklist berkas, dan referensi pasal (Ilmu Hukum, Hukum Ekonomi Syariah).
+- **Fitur core & umum** — dashboard, semester, mata kuliah, catatan, IPK, KTM, skripsi, portofolio, profil, dan kalkulator ilmiah selalu tersedia.
 
 ### Dashboard Admin
 
@@ -102,7 +112,8 @@ Buka `http://localhost:3000/admin`. Saat belum ada administrator, dashboard akan
 Fitur utama dashboard:
 
 - **Dashboard** — ringkasan pengguna, mata kuliah, tugas, ukuran database, statistik tabel, dan informasi sistem.
-- **Pengguna** — cari dan edit profil mahasiswa, jadikan administrator, reset password, atau hapus akun beserta datanya.
+- **Pengguna** — cari dan edit profil mahasiswa (termasuk kampus/fakultas/prodi via dropdown), jadikan administrator, reset password, atau hapus akun beserta datanya.
+- **Kampus & Prodi** — CRUD kampus, fakultas, dan prodi; aktif/nonaktifkan kampus; petakan fitur per prodi maupun per fakultas.
 - **Backup & Restore** — ekspor database ke JSON/SQLite, import backup, unduh backup otomatis, dan jalankan `VACUUM`.
 - **Pengaturan** — identitas situs, email dukungan, pengumuman global, registrasi, kampus custom, target IPK default, serta mode pemeliharaan.
 
@@ -118,11 +129,11 @@ Catatan keamanan backup:
 | --- | --- | --- |
 | Kesehatan | `GET /api/health` | Status aplikasi dan versi |
 | Konfigurasi | `GET /api/config` | Branding, registrasi, pengumuman, dan mode pemeliharaan publik |
-| Autentikasi | `/api/auth/*` | Registrasi, login, profil, logout, dan preset kampus |
+| Autentikasi | `/api/auth/*` | Registrasi, login, profil, logout, preset kampus, dan fitur per prodi (`/api/auth/features`) |
 | Akademik | `/api/academics/*` | Semester, mata kuliah, tugas, transkrip, dan data kartu mahasiswa |
 | Catatan | `/api/notes/*` | Daftar, pembuatan, pembaruan, dan penghapusan catatan |
 | Kehidupan | `/api/life/*` | Anggaran, skripsi, dan portfolio |
-| Admin | `/api/admin/*` | Setup/login admin, statistik, pengguna, pengaturan, dan backup/restore |
+| Admin | `/api/admin/*` | Setup/login admin, statistik, pengguna, kampus/fakultas/prodi, pemetaan fitur, pengaturan, dan backup/restore |
 
 Contoh pemeriksaan kesehatan aplikasi:
 
@@ -184,15 +195,27 @@ Batas maksimal SKS dihitung berdasarkan IPS aktif:
 | 2.00 - 2.49 | 18 |
 | < 2.00 | 15 |
 
-## Preset Kampus UNIKA UST
+## Kampus, Fakultas & Prodi
 
-Registrasi menyediakan preset untuk kedelapan fakultas yang tercantum dalam PRD. Fakultas Ilmu Komputer mencakup:
+Registrasi menyediakan enam kampus default:
 
-- Teknik Informatika (S1)
-- Sistem Informasi (S1)
-- Sains Data (S1)
+- Universitas Katolik Santo Thomas (UNIKA UST)
+- Universitas Sumatera Utara (USU)
+- Universitas Negeri Medan (Unimed)
+- Universitas Islam Negeri Sumatera Utara (UINSU)
+- Universitas Muhammadiyah Sumatera Utara (UMSU)
+- Universitas Prima Indonesia (UNPRI)
 
-Akun di kampus selain UNIKA UST dapat menggunakan input nama kampus, fakultas, dan program studi secara manual.
+Setiap kampus memiliki fakultas dan program studi sendiri. Admin dapat menambah, mengubah, menonaktifkan, atau menghapus data kampus/fakultas/prodi melalui tab **Kampus & Prodi**, lalu memetakan fitur khusus ke prodi atau fakultas tanpa mengubah kode.
+
+Kampus custom tetap dapat didaftarkan saat registrasi (jika diizinkan admin). Setelah akun dibuat, perubahan kampus/fakultas/prodi hanya dapat dilakukan administrator.
+
+### Seed & migrasi
+
+- Data preset di-seed otomatis dan idempotent saat server pertama kali berjalan.
+- Pemetaan fitur tidak ditimpa saat restart setelah admin mengubahnya.
+- User lama dimigrasikan dari kolom teks `campus_name`/`faculty`/`study_program` ke ID kampus/fakultas/prodi.
+- Backup JSON/SQLite menyertakan tabel kampus, fakultas, prodi, fitur, dan pemetaan fitur.
 
 ## Roadmap
 
@@ -202,6 +225,7 @@ PRD membagi pengembangan menjadi beberapa fase:
 - **Phase 1:** semester, mata kuliah, dashboard tugas, dan catatan perkuliahan CS.
 - **Phase 2:** kalkulator ilmiah, toolkit matematika dan matematika diskrit, serta tools SQL, regex, CIDR, dan Big-O.
 - **Phase 3-4:** target GPA lanjutan, milestone skripsi, dan builder portfolio/CV.
+- **Phase 5 (selesai):** multi-kampus, fakultas/prodi per kampus, fitur per prodi, serta toolkit Akuntansi, Teknik Sipil, dan Hukum.
 
 Beberapa fitur roadmap, termasuk OAuth Google/Apple, dapat memerlukan integrasi pihak ketiga atau implementasi lanjutan dan belum menjadi bagian wajib dari aplikasi lokal saat ini.
 

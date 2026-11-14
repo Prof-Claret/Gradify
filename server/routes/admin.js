@@ -19,13 +19,23 @@ const {
 } = require('../utils/settings');
 const { deleteOldAvatarFile } = require('../utils/avatarSecurity');
 const {
-  listCampuses, getCampusLogo, setCampusLogo, deleteCampusLogo
+  getCampusLogo, setCampusLogo, deleteCampusLogo
 } = require('../utils/campusLogos');
+const {
+  getCampusTree, getAllFeatures, getProgramFeatures, setProgramFeatures,
+  getFacultyFeatures, setFacultyFeatures, createCampus, updateCampus, deleteCampus,
+  createFaculty, updateFaculty, deleteFaculty, createProgram, updateProgram, deleteProgram,
+  setUserAcademic, seedPresets, migrateUserAcademicLinks
+} = require('../utils/campusCatalog');
 
 const router = express.Router();
 const packageJson = require('../../package.json');
 
 const DATA_TABLES = [
+  'features',
+  'campuses',
+  'faculties',
+  'programs',
   'users',
   'semesters',
   'courses',
@@ -34,10 +44,12 @@ const DATA_TABLES = [
   'skripsi_milestones',
   'portfolio_items',
   'app_settings',
-  'campus_logos'
+  'campus_logos',
+  'program_features',
+  'faculty_features'
 ];
 const RESET_SEQUENCE_TABLES = [
-  'users', 'semesters', 'courses', 'tasks', 'notes',
+  'users', 'semesters', 'courses', 'tasks', 'notes', 'campuses', 'faculties', 'programs',
   'skripsi_milestones', 'portfolio_items', 'campus_logos'
 ];
 
@@ -234,6 +246,11 @@ function importTables(tables) {
 
     ensureDefaultSettings();
     db.exec('COMMIT');
+
+    // Backup lama mungkin belum punya katalog kampus → seed ulang & migrasi user
+    if (db.prepare('SELECT COUNT(*) AS c FROM campuses').get().c === 0) seedPresets();
+    migrateUserAcademicLinks();
+
     return tableCounts();
   } catch (err) {
     db.exec('ROLLBACK');
@@ -475,10 +492,24 @@ router.put('/users/:id', (req, res) => {
   const target = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!target) return res.status(404).json({ error: 'Pengguna tidak ditemukan.' });
 
+  /* Perubahan kampus/fakultas/prodi (admin only) — gunakan ID agar konsisten */
+  const hasAcademicIds = ['campus_id', 'faculty_id', 'program_id'].some(k => k in req.body);
+  if (hasAcademicIds) {
+    const result = setUserAcademic(target.id, {
+      campus_id: req.body.campus_id || null,
+      faculty_id: req.body.faculty_id || null,
+      program_id: req.body.program_id || null
+    });
+    if (result.error) return res.status(400).json({ error: result.error });
+  }
+
   const allowed = [
-    'full_name', 'email', 'npm_nim', 'campus_name', 'faculty', 'study_program',
-    'active_semester', 'target_gpa', 'expected_graduation_year', 'avatar_emoji', 'is_admin'
+    'full_name', 'email', 'npm_nim', 'active_semester', 'target_gpa',
+    'expected_graduation_year', 'avatar_emoji', 'is_admin'
   ];
+  // Kompatibilitas: teks akademik hanya dipakai bila ID tidak dikirim
+  if (!hasAcademicIds) allowed.push('campus_name', 'faculty', 'study_program');
+
   const updates = [];
   const values = [];
 
@@ -513,9 +544,13 @@ router.put('/users/:id', (req, res) => {
     values.push(value);
   }
 
-  if (updates.length === 0) return res.status(400).json({ error: 'Tidak ada perubahan.' });
+  if (updates.length === 0 && !hasAcademicIds) {
+    return res.status(400).json({ error: 'Tidak ada perubahan.' });
+  }
 
-  db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values, target.id);
+  if (updates.length > 0) {
+    db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values, target.id);
+  }
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(target.id);
   res.json({ user: publicUser(updated), message: 'Data pengguna berhasil diperbarui.' });
 });
@@ -639,12 +674,97 @@ router.delete('/settings/logo/site', (req, res) => {
 });
 
 /* ============================================================
- * CAMPUS LOGOS — satu logo per nama kampus
+ * KAMPUS, FAKULTAS, PRODI & FITUR
  * ============================================================ */
 router.get('/campuses', (req, res) => {
-  res.json({ campuses: listCampuses() });
+  res.json({ campuses: getCampusTree({ includeInactive: true }) });
 });
 
+router.get('/features', (req, res) => {
+  res.json({ features: getAllFeatures() });
+});
+
+router.post('/campuses', (req, res) => {
+  const result = createCampus(req.body || {});
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.status(201).json({ id: result.id, message: 'Kampus berhasil ditambahkan.' });
+});
+
+router.put('/campuses/:id(\\d+)', (req, res) => {
+  const result = updateCampus(Number(req.params.id), req.body || {});
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ id: result.id, message: 'Kampus berhasil diperbarui.' });
+});
+
+router.delete('/campuses/:id(\\d+)', (req, res) => {
+  const result = deleteCampus(Number(req.params.id));
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ ok: true, message: 'Kampus berhasil dihapus.' });
+});
+
+router.post('/faculties', (req, res) => {
+  const result = createFaculty(req.body || {});
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.status(201).json({ id: result.id, message: 'Fakultas berhasil ditambahkan.' });
+});
+
+router.put('/faculties/:id(\\d+)', (req, res) => {
+  const result = updateFaculty(Number(req.params.id), req.body || {});
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ id: result.id, message: 'Fakultas berhasil diperbarui.' });
+});
+
+router.delete('/faculties/:id(\\d+)', (req, res) => {
+  const result = deleteFaculty(Number(req.params.id));
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ ok: true, message: 'Fakultas berhasil dihapus.' });
+});
+
+router.post('/programs', (req, res) => {
+  const result = createProgram(req.body || {});
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.status(201).json({ id: result.id, message: 'Prodi berhasil ditambahkan.' });
+});
+
+router.put('/programs/:id(\\d+)', (req, res) => {
+  const result = updateProgram(Number(req.params.id), req.body || {});
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ id: result.id, message: 'Prodi berhasil diperbarui.' });
+});
+
+router.delete('/programs/:id(\\d+)', (req, res) => {
+  const result = deleteProgram(Number(req.params.id));
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ ok: true, message: 'Prodi berhasil dihapus.' });
+});
+
+router.get('/programs/:id(\\d+)/features', (req, res) => {
+  const program = db.prepare('SELECT id, name FROM programs WHERE id = ?').get(req.params.id);
+  if (!program) return res.status(404).json({ error: 'Prodi tidak ditemukan.' });
+  res.json({ program, features: getProgramFeatures(program.id) });
+});
+
+router.put('/programs/:id(\\d+)/features', (req, res) => {
+  const result = setProgramFeatures(Number(req.params.id), req.body?.features);
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ features: result.features, message: 'Fitur prodi berhasil disimpan.' });
+});
+
+router.get('/faculties/:id(\\d+)/features', (req, res) => {
+  const faculty = db.prepare('SELECT id, name FROM faculties WHERE id = ?').get(req.params.id);
+  if (!faculty) return res.status(404).json({ error: 'Fakultas tidak ditemukan.' });
+  res.json({ faculty, features: getFacultyFeatures(faculty.id) });
+});
+
+router.put('/faculties/:id(\\d+)/features', (req, res) => {
+  const result = setFacultyFeatures(Number(req.params.id), req.body?.features);
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json({ features: result.features, message: 'Fitur fakultas berhasil disimpan.' });
+});
+
+/* ============================================================
+ * CAMPUS LOGOS — satu logo per nama kampus
+ * ============================================================ */
 router.post('/campuses/logo', logoUpload.single('logo'), (req, res) => {
   const campusName = String(req.body?.campus_name || '').trim();
   if (!campusName) {

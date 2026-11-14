@@ -149,6 +149,60 @@ CREATE TABLE IF NOT EXISTS campus_logos (
   logo_url TEXT NOT NULL,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+/* ---------- Multi-kampus, fakultas, prodi & fitur per prodi ---------- */
+CREATE TABLE IF NOT EXISTS campuses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE NOT NULL,
+  short_name TEXT,
+  is_default INTEGER DEFAULT 0,          -- 1 = preset bawaan (tidak boleh dihapus)
+  is_active INTEGER DEFAULT 1,           -- 0 = dinonaktifkan (tidak muncul saat registrasi)
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS faculties (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campus_id INTEGER NOT NULL REFERENCES campuses(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(campus_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS programs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  faculty_id INTEGER NOT NULL REFERENCES faculties(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  level TEXT DEFAULT 'S1',
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(faculty_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS features (
+  key TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  icon TEXT DEFAULT '🧩',
+  group_name TEXT,
+  module_path TEXT,
+  description TEXT,
+  is_core INTEGER DEFAULT 0,             -- selalu tersedia untuk semua prodi
+  is_general INTEGER DEFAULT 0,          -- tersedia untuk semua prodi (non-core)
+  sort_order INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS program_features (
+  program_id INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+  feature_key TEXT NOT NULL REFERENCES features(key) ON DELETE CASCADE,
+  PRIMARY KEY (program_id, feature_key)
+);
+
+CREATE TABLE IF NOT EXISTS faculty_features (
+  faculty_id INTEGER NOT NULL REFERENCES faculties(id) ON DELETE CASCADE,
+  feature_key TEXT NOT NULL REFERENCES features(key) ON DELETE CASCADE,
+  PRIMARY KEY (faculty_id, feature_key)
+);
 `);
 
 /* Migrate existing DBs that predate grading weight columns */
@@ -164,6 +218,9 @@ ensureColumn('courses', 'weight_uas', 'INTEGER DEFAULT 40');
 ensureColumn('courses', 'weight_lain', 'INTEGER DEFAULT 10');
 ensureColumn('users', 'avatar_url', 'TEXT');
 ensureColumn('users', 'is_admin', 'INTEGER DEFAULT 0');
+ensureColumn('users', 'campus_id', 'INTEGER');
+ensureColumn('users', 'faculty_id', 'INTEGER');
+ensureColumn('users', 'program_id', 'INTEGER');
 
 /* ============================================================
  * APP SETTINGS (admin dashboard)
@@ -232,7 +289,7 @@ const UNIKA_UST_PRESET = [
   },
   {
     faculty: 'Fakultas Keguruan dan Ilmu Pendidikan (FKIP)',
-    programs: ['Pendidikan Matematika (S1)', 'Pendidikan Bahasa Inggris (S1)', 'Pendidikam Sains (S1)']
+    programs: ['Pendidikan Matematika (S1)', 'Pendidikan Bahasa Inggris (S1)', 'Pendidikan Sains (S1)']
   }
 ];
 

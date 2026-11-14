@@ -304,6 +304,7 @@ function renderLogin(message = '') {
 const TABS = {
   dashboard: { icon: '📊', label: 'Dashboard', subtitle: 'Ringkasan kondisi website & database' },
   users: { icon: '👥', label: 'Pengguna', subtitle: 'Kelola akun mahasiswa dan administrator' },
+  academic: { icon: '🏫', label: 'Kampus & Prodi', subtitle: 'Kelola kampus, fakultas, prodi & fitur per prodi' },
   backup: { icon: '💾', label: 'Backup & Restore', subtitle: 'Ekspor, impor, dan amankan database' },
   settings: { icon: '⚙️', label: 'Pengaturan', subtitle: 'Identitas situs, akses, dan pemeliharaan' }
 };
@@ -327,6 +328,7 @@ function renderShell() {
         ${navItem('dashboard')}
         <p class="a-nav-label mt-4">Manajemen</p>
         ${navItem('users')}
+        ${navItem('academic')}
         <p class="a-nav-label mt-4">Sistem</p>
         ${navItem('backup')}
         ${navItem('settings')}
@@ -408,6 +410,7 @@ async function navigateTab(tab) {
   try {
     if (tab === 'dashboard') await loadDashboard();
     else if (tab === 'users') await loadUsers(state.usersPage, state.usersSearch);
+    else if (tab === 'academic') await loadAcademic();
     else if (tab === 'backup') await loadBackup();
     else await loadSettings();
   } catch (err) {
@@ -643,8 +646,15 @@ async function deleteUser(id, name) {
 }
 
 async function openUserModal(id) {
-  let data;
-  try { data = await request(`/api/admin/users/${id}`); }
+  let data, campuses = [];
+  try {
+    const [userData, campusData] = await Promise.all([
+      request(`/api/admin/users/${id}`),
+      request('/api/admin/campuses')
+    ]);
+    data = userData;
+    campuses = campusData.campuses;
+  }
   catch (err) { return toast(err.message, 'error'); }
 
   const u = data.user;
@@ -692,10 +702,20 @@ async function openUserModal(id) {
             <div><label class="a-label">NPM / NIM</label><input name="npm_nim" value="${esc(u.npm_nim || '')}" class="a-input" /></div>
             <div><label class="a-label">Emoji Avatar</label><input name="avatar_emoji" value="${esc(u.avatar_emoji || '🎓')}" class="a-input" /></div>
           </div>
-          <div><label class="a-label">Nama Kampus</label><input name="campus_name" value="${esc(u.campus_name || '')}" class="a-input" /></div>
           <div class="grid sm:grid-cols-2 gap-3">
-            <div><label class="a-label">Fakultas</label><input name="faculty" value="${esc(u.faculty || '')}" class="a-input" /></div>
-            <div><label class="a-label">Program Studi</label><input name="study_program" value="${esc(u.study_program || '')}" class="a-input" /></div>
+            <div><label class="a-label">Kampus</label>
+              <select name="campus_id" id="um-campus" class="a-input">
+                <option value="">— Tidak ditentukan —</option>
+                ${campuses.map(c => `<option value="${c.id}" ${Number(u.campus_id) === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
+              </select>
+            </div>
+            <div><label class="a-label">Fakultas</label>
+              <select name="faculty_id" id="um-faculty" class="a-input" disabled></select>
+            </div>
+          </div>
+          <div><label class="a-label">Program Studi</label>
+            <select name="program_id" id="um-program" class="a-input" disabled></select>
+            <p class="text-[10px] text-slate-400 mt-1">Kampus, fakultas, dan prodi hanya dapat diubah oleh admin. Perubahan berlaku pada pemuatan aplikasi mahasiswa berikutnya.</p>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div><label class="a-label">Semester</label>
@@ -750,11 +770,55 @@ async function openUserModal(id) {
   document.addEventListener('keydown', onKey);
 
   const form = wrapper.querySelector('#user-edit-form');
+
+  /* ---------- cascade kampus → fakultas → prodi ---------- */
+  const campusSel = wrapper.querySelector('#um-campus');
+  const facultySel = wrapper.querySelector('#um-faculty');
+  const programSel = wrapper.querySelector('#um-program');
+
+  function fillPrograms(keepProgramId) {
+    const campus = campuses.find(c => c.id === Number(campusSel.value));
+    const faculty = campus?.faculties.find(f => f.id === Number(facultySel.value));
+    const programs = faculty?.programs || [];
+    programSel.innerHTML = '<option value="">— Pilih Prodi —</option>' +
+      programs.map(p => `<option value="${p.id}">${esc(p.fullName || p.name)}</option>`).join('');
+    programSel.disabled = !programs.length;
+    programSel.value = keepProgramId ? String(keepProgramId) : '';
+    if (programSel.value && !programs.some(p => String(p.id) === programSel.value)) programSel.value = '';
+  }
+
+  function fillFaculties(keepFacultyId, keepProgramId) {
+    const campus = campuses.find(c => c.id === Number(campusSel.value));
+    const faculties = campus?.faculties || [];
+    facultySel.innerHTML = '<option value="">— Pilih Fakultas —</option>' +
+      faculties.map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('');
+    facultySel.disabled = !faculties.length;
+    facultySel.value = keepFacultyId ? String(keepFacultyId) : '';
+    fillPrograms(keepProgramId);
+  }
+
+  campusSel.addEventListener('change', () => fillFaculties());
+  facultySel.addEventListener('change', () => fillPrograms());
+  fillFaculties(u.faculty_id, u.program_id);
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(form);
     const errEl = wrapper.querySelector('#user-edit-err');
     errEl.classList.add('hidden');
+
+    if (campusSel.value && !programSel.value) {
+      errEl.textContent = 'Pilih fakultas dan program studi, atau kosongkan pilihan kampus.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    const academic = programSel.value ? {
+      campus_id: parseInt(campusSel.value, 10),
+      faculty_id: parseInt(facultySel.value, 10),
+      program_id: parseInt(programSel.value, 10)
+    } : {};
+
     const btn = form.querySelector('button.a-btn-primary');
     btn.disabled = true;
     btn.textContent = '⏳ Menyimpan…';
@@ -766,13 +830,11 @@ async function openUserModal(id) {
           email: fd.get('email'),
           npm_nim: fd.get('npm_nim'),
           avatar_emoji: fd.get('avatar_emoji'),
-          campus_name: fd.get('campus_name'),
-          faculty: fd.get('faculty'),
-          study_program: fd.get('study_program'),
           active_semester: parseInt(fd.get('active_semester'), 10),
           target_gpa: parseFloat(fd.get('target_gpa')),
           expected_graduation_year: fd.get('expected_graduation_year') ? parseInt(fd.get('expected_graduation_year'), 10) : null,
-          is_admin: form.querySelector('[name="is_admin"]').checked
+          is_admin: form.querySelector('[name="is_admin"]').checked,
+          ...academic
         }
       });
       toast('Data pengguna berhasil disimpan.');
@@ -809,6 +871,295 @@ async function openUserModal(id) {
       close();
       loadUsers(state.usersPage, state.usersSearch);
     } catch (err) { toast(err.message, 'error'); }
+  });
+}
+
+/* ============================================================
+ * KAMPUS & PRODI
+ * ============================================================ */
+let featureCatalog = null;
+
+async function loadAcademic() {
+  const [{ campuses }, featuresData] = await Promise.all([
+    request('/api/admin/campuses'),
+    request('/api/admin/features')
+  ]);
+  featureCatalog = featuresData.features;
+  const main = document.getElementById('admin-main');
+  const totalPrograms = campuses.reduce((n, c) => n + c.faculties.reduce((m, f) => m + f.programs.length, 0), 0);
+
+  const campusCard = (c) => `
+    <section class="a-card p-4">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <h3 class="font-extrabold text-slate-800">${esc(c.name)}</h3>
+            ${c.isDefault
+              ? '<span class="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">Default</span>'
+              : '<span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">Custom</span>'}
+            ${c.isActive
+              ? '<span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Aktif</span>'
+              : '<span class="text-[10px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">Nonaktif</span>'}
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1">${esc(c.short_name || '')} · ${c.userCount} mahasiswa · ${c.faculties.length} fakultas</p>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          <button data-add-faculty="${c.id}" class="a-btn a-btn-primary a-btn-sm">+ Fakultas</button>
+          <button data-edit-campus="${c.id}" class="a-btn a-btn-light a-btn-sm">✏️ Edit</button>
+          <button data-toggle-campus="${c.id}" class="a-btn a-btn-light a-btn-sm">${c.isActive ? '⏸️ Nonaktifkan' : '▶️ Aktifkan'}</button>
+          ${c.isDefault ? '' : `<button data-del-campus="${c.id}" class="a-btn a-btn-danger a-btn-sm">🗑️</button>`}
+        </div>
+      </div>
+
+      <div class="mt-3 space-y-2">
+        ${c.faculties.length === 0
+          ? '<p class="text-xs text-slate-400 py-2">Belum ada fakultas. Tambahkan fakultas pertama.</p>'
+          : c.faculties.map(f => `
+            <div class="border border-slate-200 rounded-xl p-3 bg-slate-50/60">
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="font-semibold text-sm text-slate-800">${esc(f.name)}</p>
+                  <p class="text-[10px] text-slate-400">${f.userCount} mahasiswa · ${f.programs.length} prodi</p>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                  <button data-add-program="${f.id}" class="a-btn a-btn-light a-btn-sm">+ Prodi</button>
+                  <button data-feat-faculty="${f.id}" data-name="${esc(f.name)}" class="a-btn a-btn-light a-btn-sm">🧩 Fitur Fakultas</button>
+                  <button data-edit-faculty="${f.id}" class="a-btn a-btn-light a-btn-sm">✏️</button>
+                  <button data-del-faculty="${f.id}" data-name="${esc(f.name)}" class="a-btn a-btn-danger a-btn-sm">🗑️</button>
+                </div>
+              </div>
+              <div class="grid sm:grid-cols-2 gap-2 mt-2">
+                ${f.programs.length === 0
+                  ? '<p class="text-[11px] text-slate-400">Belum ada prodi.</p>'
+                  : f.programs.map(pr => `
+                    <div class="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">
+                      <div class="min-w-0">
+                        <p class="text-xs font-semibold text-slate-700 truncate">${esc(pr.name)} <span class="text-slate-400 font-normal">(${esc(pr.level)})</span></p>
+                        <p class="text-[10px] text-slate-400">${pr.userCount} mahasiswa</p>
+                      </div>
+                      <div class="flex gap-1 shrink-0">
+                        <button data-feat-program="${pr.id}" data-name="${esc(pr.fullName)}" class="a-btn a-btn-light a-btn-sm" title="Atur fitur">🧩</button>
+                        <button data-edit-program="${pr.id}" data-name="${esc(pr.name)}" data-level="${esc(pr.level)}" class="a-btn a-btn-light a-btn-sm" title="Edit prodi">✏️</button>
+                        <button data-del-program="${pr.id}" data-name="${esc(pr.fullName)}" class="a-btn a-btn-danger a-btn-sm" title="Hapus prodi">🗑️</button>
+                      </div>
+                    </div>`).join('')}
+              </div>
+            </div>`).join('')}
+      </div>
+    </section>`;
+
+  main.innerHTML = `
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+      <div>
+        <h2 class="text-xl font-extrabold text-slate-800">Kampus, Fakultas & Prodi</h2>
+        <p class="text-xs text-slate-500">${campuses.length} kampus · ${totalPrograms} prodi. Fitur dapat dipetakan per prodi maupun per fakultas.</p>
+      </div>
+      <button id="add-campus" class="a-btn a-btn-primary">+ Tambah Kampus</button>
+    </div>
+    <div class="space-y-4">${campuses.map(campusCard).join('')}</div>`;
+
+  const refresh = () => loadAcademic();
+  main.querySelector('#add-campus').addEventListener('click', async () => {
+    const name = prompt('Nama kampus baru:');
+    if (!name || !name.trim()) return;
+    const shortName = prompt('Nama singkat kampus (opsional):', name.trim()) || '';
+    try {
+      const res = await request('/api/admin/campuses', { method: 'POST', body: { name: name.trim(), short_name: shortName.trim() } });
+      toast(res.message || 'Kampus ditambahkan.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  });
+
+  main.querySelectorAll('[data-add-faculty]').forEach(btn => btn.addEventListener('click', async () => {
+    const name = prompt('Nama fakultas:');
+    if (!name || !name.trim()) return;
+    try {
+      const res = await request('/api/admin/faculties', { method: 'POST', body: { campus_id: Number(btn.dataset.addFaculty), name: name.trim() } });
+      toast(res.message || 'Fakultas ditambahkan.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  }));
+
+  main.querySelectorAll('[data-edit-campus]').forEach(btn => btn.addEventListener('click', async () => {
+    const campus = campuses.find(c => c.id === Number(btn.dataset.editCampus));
+    if (!campus) return;
+    let name = campus.name;
+    if (!campus.isDefault) {
+      name = prompt('Nama kampus:', campus.name);
+      if (name === null) return;
+      if (!name.trim()) return toast('Nama kampus wajib diisi.', 'warn');
+    }
+    const shortName = prompt('Nama singkat:', campus.short_name || '');
+    if (shortName === null) return;
+    try {
+      const res = await request(`/api/admin/campuses/${campus.id}`, { method: 'PUT', body: { name: name.trim(), short_name: shortName.trim() } });
+      toast(res.message || 'Kampus diperbarui.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  }));
+
+  main.querySelectorAll('[data-toggle-campus]').forEach(btn => btn.addEventListener('click', async () => {
+    const campus = campuses.find(c => c.id === Number(btn.dataset.toggleCampus));
+    if (!campus) return;
+    try {
+      const res = await request(`/api/admin/campuses/${campus.id}`, {
+        method: 'PUT', body: { is_active: !campus.isActive }
+      });
+      toast(res.message || 'Status kampus diperbarui.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  }));
+
+  main.querySelectorAll('[data-del-campus]').forEach(btn => btn.addEventListener('click', async () => {
+    const campus = campuses.find(c => c.id === Number(btn.dataset.delCampus));
+    if (!campus || !confirm(`Hapus kampus "${campus.name}"? Kampus default tidak dapat dihapus.`)) return;
+    try {
+      const res = await request(`/api/admin/campuses/${campus.id}`, { method: 'DELETE' });
+      toast(res.message || 'Kampus dihapus.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  }));
+
+  main.querySelectorAll('[data-add-program]').forEach(btn => btn.addEventListener('click', async () => {
+    const name = prompt('Nama program studi (tanpa gelar):');
+    if (!name || !name.trim()) return;
+    const level = prompt('Jenjang:', 'S1') || 'S1';
+    try {
+      const res = await request('/api/admin/programs', {
+        method: 'POST', body: { faculty_id: Number(btn.dataset.addProgram), name: name.trim(), level: level.trim().toUpperCase() }
+      });
+      toast(res.message || 'Prodi ditambahkan.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  }));
+
+  main.querySelectorAll('[data-edit-faculty]').forEach(btn => btn.addEventListener('click', async () => {
+    let faculty = null;
+    for (const c of campuses) faculty = faculty || c.faculties.find(f => f.id === Number(btn.dataset.editFaculty));
+    if (!faculty) return;
+    const name = prompt('Nama fakultas:', faculty.name);
+    if (name === null || !name.trim()) return;
+    try {
+      const res = await request(`/api/admin/faculties/${faculty.id}`, { method: 'PUT', body: { name: name.trim() } });
+      toast(res.message || 'Fakultas diperbarui.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  }));
+
+  main.querySelectorAll('[data-del-faculty]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm(`Hapus fakultas "${btn.dataset.name}"? Prodi di dalamnya juga akan dihapus.`)) return;
+    try {
+      const res = await request(`/api/admin/faculties/${btn.dataset.delFaculty}`, { method: 'DELETE' });
+      toast(res.message || 'Fakultas dihapus.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  }));
+
+  main.querySelectorAll('[data-edit-program]').forEach(btn => btn.addEventListener('click', async () => {
+    const name = prompt('Nama prodi:', btn.dataset.name);
+    if (name === null || !name.trim()) return;
+    const level = prompt('Jenjang:', btn.dataset.level) || btn.dataset.level || 'S1';
+    try {
+      const res = await request(`/api/admin/programs/${btn.dataset.editProgram}`, {
+        method: 'PUT', body: { name: name.trim(), level: level.trim().toUpperCase() }
+      });
+      toast(res.message || 'Prodi diperbarui.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  }));
+
+  main.querySelectorAll('[data-del-program]').forEach(btn => btn.addEventListener('click', async () => {
+    if (!confirm(`Hapus prodi "${btn.dataset.name}"?`)) return;
+    try {
+      const res = await request(`/api/admin/programs/${btn.dataset.delProgram}`, { method: 'DELETE' });
+      toast(res.message || 'Prodi dihapus.');
+      refresh();
+    } catch (err) { toast(err.message, 'error'); }
+  }));
+
+  main.querySelectorAll('[data-feat-program]').forEach(btn => btn.addEventListener('click', () =>
+    openFeatureModal('program', Number(btn.dataset.featProgram), btn.dataset.name)));
+  main.querySelectorAll('[data-feat-faculty]').forEach(btn => btn.addEventListener('click', () =>
+    openFeatureModal('faculty', Number(btn.dataset.featFaculty), btn.dataset.name)));
+}
+
+async function openFeatureModal(type, id, name) {
+  let data;
+  try {
+    data = await request(type === 'program'
+      ? `/api/admin/programs/${id}/features`
+      : `/api/admin/faculties/${id}/features`);
+  } catch (err) { return toast(err.message, 'error'); }
+
+  const catalog = featureCatalog || (await request('/api/admin/features')).features;
+  const selected = new Set(data.features || []);
+  const selectable = catalog.filter(f => !f.isCore && !f.isGeneral);
+  const groups = {};
+  for (const f of selectable) (groups[f.group || 'Umum'] ||= []).push(f);
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'a-modal-backdrop';
+  wrapper.innerHTML = `
+    <div class="a-modal" role="dialog" aria-modal="true" aria-label="Atur fitur">
+      <div class="flex items-start justify-between gap-3 p-5 border-b border-slate-200">
+        <div>
+          <h2 class="font-extrabold text-slate-800">🧩 Fitur ${type === 'program' ? 'Prodi' : 'Fakultas'}</h2>
+          <p class="text-xs text-slate-500 mt-0.5">${esc(name)}</p>
+        </div>
+        <button data-close class="text-slate-400 hover:text-slate-700 text-xl leading-none p-1">✕</button>
+      </div>
+      <div class="p-5 max-h-[65vh] overflow-y-auto space-y-4">
+        <p class="text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+          Fitur inti dan umum (dashboard, catatan, kalkulator, dll.) selalu tersedia dan tidak perlu dipilih.
+          ${type === 'faculty' ? 'Fitur fakultas berlaku untuk semua prodi di fakultas ini.' : ''}
+        </p>
+        ${Object.entries(groups).map(([group, items]) => `
+          <div>
+            <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-2">${esc(group)}</p>
+            <div class="grid sm:grid-cols-2 gap-1.5">
+              ${items.map(f => `
+                <label class="flex items-start gap-2 border border-slate-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-50">
+                  <input type="checkbox" value="${esc(f.key)}" ${selected.has(f.key) ? 'checked' : ''} class="mt-0.5 accent-indigo-600" />
+                  <span class="min-w-0">
+                    <span class="block text-sm font-semibold text-slate-700">${esc(f.icon)} ${esc(f.label)}</span>
+                    <span class="block text-[10px] text-slate-400">${esc(f.description || '')}</span>
+                  </span>
+                </label>`).join('')}
+            </div>
+          </div>`).join('')}
+        <p id="feat-err" class="text-rose-600 text-xs hidden"></p>
+      </div>
+      <div class="flex justify-end gap-2 p-4 border-t border-slate-200">
+        <button type="button" data-close class="a-btn a-btn-light">Batal</button>
+        <button type="button" id="feat-save" class="a-btn a-btn-primary">💾 Simpan Fitur</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrapper);
+
+  const close = () => wrapper.remove();
+  wrapper.addEventListener('click', e => { if (e.target === wrapper) close(); });
+  wrapper.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
+
+  wrapper.querySelector('#feat-save').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = '⏳ Menyimpan…';
+    const keys = [...wrapper.querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
+    try {
+      const res = await request(type === 'program'
+        ? `/api/admin/programs/${id}/features`
+        : `/api/admin/faculties/${id}/features`, {
+        method: 'PUT', body: { features: keys }
+      });
+      toast(res.message || 'Fitur berhasil disimpan.');
+      close();
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '💾 Simpan Fitur';
+      const errEl = wrapper.querySelector('#feat-err');
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }
   });
 }
 

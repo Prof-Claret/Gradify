@@ -198,31 +198,31 @@ export function render(box, ctx) {
     });
   }
 
-  /* ---- STEP 2: Kampus (radio preset/custom) ---- */
+  /* ---- STEP 2: Kampus → Fakultas → Prodi ---- */
   async function step2() {
     const body = box.querySelector('#wiz-body');
-    let campusMode = 'preset';
-    let faculties = [];
-    let faculty = '', program = '', customCampus = '', customFac = '', customProdi = '';
+    let campusMode = wizard.data.campus_mode === 'custom' ? 'custom' : 'preset';
+    let campuses = [];
+    let selectedCampus = null, selectedFaculty = null, selectedProgram = null;
+    let customCampus = campusMode === 'custom' ? (wizard.data.campus_name || '') : '';
+    let customFac = campusMode === 'custom' ? (wizard.data.faculty || '') : '';
+    let customProdi = campusMode === 'custom' ? (wizard.data.study_program || '') : '';
 
-    await api.get('/api/auth/presets').then(({ campuses }) => {
-      faculties = campuses[0].faculties;
-    }).catch(() => {
-      faculties = [
-        { faculty: 'Fakultas Ilmu Komputer (FIKOM)', programs: ['Teknik Informatika (S1)', 'Sistem Informasi (S1)', 'Sains Data (S1)'] }
-      ];
-    });
+    try {
+      const data = await api.get('/api/auth/presets');
+      campuses = (data.campuses || []).filter(c => c.id !== 'custom' && Array.isArray(c.faculties));
+    } catch { campuses = []; }
 
     body.innerHTML = `
       <h3 class="font-bold text-slate-800 mb-1">Langkah 2 — Informasi Kampus</h3>
-      <p class="text-sm text-slate-500 mb-4">Pilih kampus dengan preset bawaan atau tambahkan kampus baru.</p>
+      <p class="text-sm text-slate-500 mb-4">Pilih kampus, fakultas, dan program studi. Kampus/fakultas/prodi hanya dapat diubah oleh admin setelah akun dibuat.</p>
 
       <div class="space-y-2 mb-5" id="campus-mode">
         <label class="flex items-start gap-3 border-2 border-indigo-500 bg-indigo-50 rounded-xl p-4 cursor-pointer" id="opt-preset">
           <input type="radio" name="cmode" checked class="mt-1 accent-indigo-600" />
           <div>
-            <p class="font-semibold text-sm text-slate-800">🏛️ Pilih Kampus (Default UNIKA UST)</p>
-            <p class="text-xs text-slate-500">Universitas Katolik Santo Thomas Medan — dropdown Fakultas & Prodi otomatis.</p>
+            <p class="font-semibold text-sm text-slate-800">🏛️ Pilih Kampus</p>
+            <p class="text-xs text-slate-500">Kampus default Sumatera Utara — dropdown Fakultas & Prodi otomatis.</p>
           </div>
         </label>
         ${allowCustomCampus ? `
@@ -252,24 +252,79 @@ export function render(box, ctx) {
     }
 
     function drawPreset() {
+      if (!campuses.length) {
+        fields.innerHTML = `<p class="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          Belum ada kampus aktif. Gunakan mode input manual atau hubungi admin.</p>`;
+        return;
+      }
+
       fields.innerHTML = `
         <div class="grid md:grid-cols-2 gap-3">
-          ${field('Nama Kampus', `<input disabled value="Universitas Katolik Santo Thomas (UNIKA UST Medan)" class="g-inp bg-slate-100" />`)}
-          ${field('Fakultas *', `<select id="sel-fac" class="g-inp"><option value="">— Pilih Fakultas —</option>
-            ${faculties.map((f, i) => `<option value="${i}">${esc(f.faculty)}</option>`).join('')}</select>`)}
-          ${field('Program Studi (Prodi) *', `<select id="sel-prodi" disabled class="g-inp bg-slate-100"><option>— Pilih Fakultas dulu —</option></select>`)}
+          ${field('Kampus *', `<select id="sel-campus" class="g-inp">
+            ${campuses.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}
+          </select>`)}
+          ${field('Fakultas *', `<select id="sel-fac" class="g-inp" disabled><option value="">— Pilih Fakultas —</option></select>`)}
+          ${field('Program Studi (Prodi) *', `<select id="sel-prodi" class="g-inp" disabled><option value="">— Pilih Fakultas dulu —</option></select>`)}
         </div>`;
-      const selF = fields.querySelector('#sel-fac'), selP = fields.querySelector('#sel-prodi');
-      selF.addEventListener('change', () => {
-        const f = faculties[selF.value];
-        faculty = f?.faculty || '';
-        selP.disabled = !f;
-        selP.classList.toggle('bg-slate-100', !f);
-        selP.innerHTML = !f ? '<option>— Pilih Fakultas dulu —</option>'
-          : f.programs.map(p => `<option>${esc(p)}</option>`).join('');
-        program = f ? f.programs[0] : '';
+
+      const selC = fields.querySelector('#sel-campus');
+      const selF = fields.querySelector('#sel-fac');
+      const selP = fields.querySelector('#sel-prodi');
+
+      const findCampus = () => campuses.find(c => c.id === Number(selC.value)) || null;
+
+      function fillFaculties() {
+        selectedCampus = findCampus();
+        selectedFaculty = null;
+        selectedProgram = null;
+        const list = selectedCampus?.faculties || [];
+        selF.innerHTML = '<option value="">— Pilih Fakultas —</option>' +
+          list.map(f => `<option value="${f.id}">${esc(f.name)}</option>`).join('');
+        selF.disabled = !list.length;
+        selP.innerHTML = '<option value="">— Pilih Fakultas dulu —</option>';
+        selP.disabled = true;
+      }
+
+      function fillPrograms() {
+        const list = selectedCampus?.faculties || [];
+        selectedFaculty = list.find(f => f.id === Number(selF.value)) || null;
+        selectedProgram = null;
+        const programs = selectedFaculty?.programs || [];
+        selP.innerHTML = '<option value="">— Pilih Prodi —</option>' +
+          programs.map(p => `<option value="${p.id}">${esc(p.full_name || p.name)}</option>`).join('');
+        selP.disabled = !programs.length;
+        if (programs.length === 1) {
+          selP.value = String(programs[0].id);
+          selectedProgram = programs[0];
+        }
+      }
+
+      selC.addEventListener('change', fillFaculties);
+      selF.addEventListener('change', fillPrograms);
+      selP.addEventListener('change', () => {
+        selectedProgram = (selectedFaculty?.programs || []).find(p => p.id === Number(selP.value)) || null;
       });
-      selP.addEventListener('change', () => { program = selP.value; });
+
+      // Pulihkan pilihan sebelumnya (tombol Kembali)
+      if (wizard.data.campus_id) {
+        const idx = campuses.findIndex(c => c.id === wizard.data.campus_id);
+        if (idx >= 0) selC.value = String(campuses[idx].id);
+      }
+      fillFaculties();
+      if (wizard.data.faculty_id) {
+        const facId = String(wizard.data.faculty_id);
+        if ([...selF.options].some(o => o.value === facId)) {
+          selF.value = facId;
+          fillPrograms();
+          if (wizard.data.program_id) {
+            const progId = String(wizard.data.program_id);
+            if ([...selP.options].some(o => o.value === progId)) {
+              selP.value = progId;
+              selectedProgram = (selectedFaculty?.programs || []).find(p => p.id === Number(progId)) || null;
+            }
+          }
+        }
+      }
     }
 
     function drawCustom() {
@@ -297,28 +352,47 @@ export function render(box, ctx) {
 
     optPreset.addEventListener('click', () => setMode('preset'));
     optCustom?.addEventListener('click', () => setMode('custom'));
-    drawPreset();
+    setMode(campusMode);
 
     body.querySelector('#s2-prev').addEventListener('click', () => { wizard.step = 1; renderWizard(); });
     body.querySelector('#s2-next').addEventListener('click', () => {
       const errEl = body.querySelector('#s2-err');
       errEl.classList.add('hidden');
-      if (campusMode === 'preset' && (!faculty || !program)) {
-        errEl.textContent = 'Fakultas dan Prodi wajib dipilih.';
-      } else if (campusMode === 'custom' && !customCampus) {
-        errEl.textContent = 'Nama kampus custom wajib diisi.';
-      } else {
+
+      if (campusMode === 'preset') {
+        if (!selectedCampus || !selectedFaculty || !selectedProgram) {
+          errEl.textContent = 'Kampus, fakultas, dan prodi wajib dipilih.';
+          errEl.classList.remove('hidden');
+          return;
+        }
         Object.assign(wizard.data, {
-          campus_mode: campusMode,
-          campus_name: campusMode === 'custom' ? customCampus : undefined,
-          faculty: campusMode === 'preset' ? faculty : (customFac || 'Fakultas Tidak Ditetapkan'),
-          study_program: campusMode === 'preset' ? program : (customProdi || 'Prodi Tidak Ditetapkan')
+          campus_mode: 'preset',
+          campus_id: selectedCampus.id,
+          faculty_id: selectedFaculty.id,
+          program_id: selectedProgram.id,
+          campus_name: selectedCampus.name,
+          faculty: selectedFaculty.name,
+          study_program: selectedProgram.full_name || selectedProgram.name
         });
-        wizard.step = 3;
-        renderWizard();
-        return;
+      } else {
+        if (!customCampus.trim()) {
+          errEl.textContent = 'Nama kampus custom wajib diisi.';
+          errEl.classList.remove('hidden');
+          return;
+        }
+        Object.assign(wizard.data, {
+          campus_mode: 'custom',
+          campus_id: undefined,
+          faculty_id: undefined,
+          program_id: undefined,
+          campus_name: customCampus.trim(),
+          faculty: customFac.trim() || 'Fakultas Tidak Ditetapkan',
+          study_program: customProdi.trim() || 'Prodi Tidak Ditetapkan'
+        });
       }
-      errEl.classList.remove('hidden');
+
+      wizard.step = 3;
+      renderWizard();
     });
   }
 
@@ -361,7 +435,7 @@ export function render(box, ctx) {
         <p class="font-semibold text-indigo-900 mb-1">📋 Ringkasan</p>
         <ul class="text-indigo-900/80 space-y-0.5 text-xs">
           <li>• Nama: <b>${esc(wizard.data.full_name)}</b> ${esc(wizard.data.avatar_emoji)} · NPM: <b>${esc(wizard.data.npm_nim || '—')}</b></li>
-          <li>• Kampus: <b>${esc(wizard.data.campus_mode === 'preset' ? 'UNIKA UST Medan' : wizard.data.campus_name)}</b></li>
+          <li>• Kampus: <b>${esc(wizard.data.campus_name || '—')}</b></li>
           <li>• ${esc(wizard.data.faculty)} — ${esc(wizard.data.study_program)}</li>
         </ul>
       </div>

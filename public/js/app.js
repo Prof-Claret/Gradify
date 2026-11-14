@@ -37,6 +37,8 @@ const state = {
   user: null,
   currentRoute: 'dashboard',
   viewModules: {},
+  features: null,        // null = belum dimuat → fallback ke fitur core
+  academic: null,
   config: {
     site_name: 'Gradify',
     site_tagline: 'Simplify Your Academic Journey',
@@ -124,21 +126,54 @@ function showMaintenance() {
 
 /* ---------- route registry ---------- */
 export const routes = {
-  dashboard:    { module: '/js/views/dashboard.js',  group: null,  icon: '📊', label: 'Dashboard' },
-  semesters:    { module: '/js/views/semesters.js',  group: 'Akademik', icon: '🗓️', label: 'Kelola Semester' },
-  courses:      { module: '/js/views/courses.js',    group: 'Akademik', icon: '📚', label: 'Mata Kuliah' },
-  notes:        { module: '/js/views/notes.js',      group: 'Akademik', icon: '📝', label: 'Catatan CS' },
-  gpa:          { module: '/js/views/gpa.js',        group: 'Akademik', icon: '🎯', label: 'IPK & Transkrip' },
-  'student-card': { module: '/js/views/student-card.js', group: 'Akademik', icon: '🪪', label: 'Kartu Mahasiswa' },
-  calculator:   { module: '/js/views/calculator.js', group: 'Toolkit CS', icon: '🧮', label: 'Kalkulator Ilmiah' },
-  toolkit:      { module: '/js/views/toolkit.js',    group: 'Toolkit CS', icon: '🛠️', label: 'CS Math Toolkit' },
-  discrete:     { module: '/js/views/discrete.js',   group: 'Toolkit CS', icon: '🔗', label: 'Matematika Diskrit' },
-  devtools:     { module: '/js/views/devtools.js',   group: 'Toolkit CS', icon: '💻', label: 'Dev Tools' },
-  skripsi:      { module: '/js/views/life.js',       group: 'Kehidupan', icon: '📗', label: 'Skripsi' },
-  portfolio:    { module: '/js/views/life.js',       group: 'Kehidupan', icon: '🏅', label: 'Portofolio & CV' },
-  profile:      { module: '/js/views/profile.js',    group: null,  icon: '⚙️', label: 'Pengaturan Akun' },
-  about:        { module: '/js/views/about.js',      group: null,  icon: 'ℹ️', label: 'Tentang' }
+  dashboard:    { module: '/js/views/dashboard.js',  group: null,  icon: '📊', label: 'Dashboard', featureKey: 'dashboard' },
+  semesters:    { module: '/js/views/semesters.js',  group: 'Akademik', icon: '🗓️', label: 'Kelola Semester', featureKey: 'semesters' },
+  courses:      { module: '/js/views/courses.js',    group: 'Akademik', icon: '📚', label: 'Mata Kuliah', featureKey: 'courses' },
+  notes:        { module: '/js/views/notes.js',      group: 'Akademik', icon: '📝', label: 'Catatan', featureKey: 'notes' },
+  gpa:          { module: '/js/views/gpa.js',        group: 'Akademik', icon: '🎯', label: 'IPK & Transkrip', featureKey: 'gpa' },
+  'student-card': { module: '/js/views/student-card.js', group: 'Akademik', icon: '🪪', label: 'Kartu Mahasiswa', featureKey: 'student-card' },
+  calculator:   { module: '/js/views/calculator.js', group: 'Umum', icon: '🧮', label: 'Kalkulator Ilmiah', featureKey: 'calculator' },
+  toolkit:      { module: '/js/views/toolkit.js',    group: 'Toolkit CS', icon: '🛠️', label: 'CS Math Toolkit', featureKey: 'cs-toolkit' },
+  discrete:     { module: '/js/views/discrete.js',   group: 'Toolkit CS', icon: '🔗', label: 'Matematika Diskrit', featureKey: 'discrete-math' },
+  devtools:     { module: '/js/views/devtools.js',   group: 'Toolkit CS', icon: '💻', label: 'Dev Tools', featureKey: 'dev-tools' },
+  accounting:   { module: '/js/views/accounting.js', group: 'Toolkit Keuangan', icon: '🧾', label: 'Toolkit Keuangan & Akuntansi', featureKey: 'acc-toolkit' },
+  civil:        { module: '/js/views/civil.js',      group: 'Toolkit Teknik', icon: '🏗️', label: 'Toolkit Teknik Sipil', featureKey: 'civil-toolkit' },
+  law:          { module: '/js/views/law.js',        group: 'Toolkit Hukum', icon: '⚖️', label: 'Toolkit Hukum', featureKey: 'law-toolkit' },
+  skripsi:      { module: '/js/views/life.js',       group: 'Kehidupan', icon: '📗', label: 'Skripsi', featureKey: 'skripsi' },
+  portfolio:    { module: '/js/views/life.js',       group: 'Kehidupan', icon: '🏅', label: 'Portofolio & CV', featureKey: 'portfolio' },
+  profile:      { module: '/js/views/profile.js',    group: null,  icon: '⚙️', label: 'Pengaturan Akun', featureKey: 'profile' },
+  about:        { module: '/js/views/about.js',      group: null,  icon: 'ℹ️', label: 'Tentang', featureKey: 'about' }
 };
+
+const CORE_FEATURE_KEYS = new Set([
+  'dashboard', 'semesters', 'courses', 'notes', 'gpa', 'student-card',
+  'calculator', 'skripsi', 'portfolio', 'profile', 'about'
+]);
+
+/** Muat fitur yang boleh diakses user dari server. */
+async function loadFeatures() {
+  try {
+    const { features, academic } = await api.get('/api/auth/features');
+    state.features = Array.isArray(features) ? features : [];
+    state.academic = academic || null;
+  } catch {
+    state.features = null;
+    state.academic = null;
+  }
+}
+
+/** Apakah user boleh membuka route tertentu? */
+export function isRouteAllowed(routeKey) {
+  const r = routes[routeKey];
+  if (!r || !r.featureKey) return true;
+  if (!state.features) return CORE_FEATURE_KEYS.has(r.featureKey);
+  return state.features.some(f => f.key === r.featureKey);
+}
+
+function hasSpecialTools() {
+  if (!state.features) return false;
+  return state.features.some(f => !f.isCore && !CORE_FEATURE_KEYS.has(f.key) && f.key !== 'calculator');
+}
 
 /** Baca route dari hash URL (dipakai saat refresh / deep-link). */
 function syncRouteFromHash() {
@@ -154,6 +189,11 @@ function syncRouteFromHash() {
 /* navigate via hash */
 export function navigate(route, subTab) {
   if (!routes[route]) route = 'dashboard';
+  if (!isRouteAllowed(route)) {
+    toast('Tools ini tidak tersedia untuk program studi Anda.', 'warn');
+    route = 'dashboard';
+    subTab = null;
+  }
   state.currentRoute = route;
   window.location.hash = subTab ? `${route}/${subTab}` : route;
   if (subTab) sessionStorage.setItem('gradify_tab', subTab);
@@ -172,6 +212,8 @@ const ctx = {
   navigate,
   get user() { return state.user; },
   get config() { return state.config; },
+  get features() { return state.features || []; },
+  get academic() { return state.academic; },
   get currentRoute() { return state.currentRoute; },
   refresh: () => renderView()
 };
@@ -180,7 +222,13 @@ let renderSeq = 0;
 async function renderView() {
   const main = document.getElementById('main-content');
   const [base, ...extra] = state.currentRoute.split('/');
-  const def = routes[base] || routes.dashboard;
+  if (!isRouteAllowed(base)) {
+    state.currentRoute = 'dashboard';
+    window.location.hash = 'dashboard';
+    toast('Tools ini tidak tersedia untuk program studi Anda.', 'warn');
+  }
+  const safeBase = isRouteAllowed(base) ? base : 'dashboard';
+  const def = routes[safeBase] || routes.dashboard;
   document.getElementById('page-title').textContent = def.label;
 
   try {
@@ -217,20 +265,34 @@ function renderNavItem(key) {
     <span class="text-base w-5 text-center pointer-events-none">${r.icon}</span><span class="pointer-events-none">${esc(r.label)}</span></a>`;
 }
 
+const GROUP_ORDER = ['Akademik', 'Toolkit CS', 'Toolkit Keuangan', 'Toolkit Teknik', 'Toolkit Hukum', 'Umum', 'Kehidupan'];
+
 function renderSidebar() {
-  const groups = { Akademik: [], 'Toolkit CS': [], Kehidupan: [] };
+  const groups = {};
   const top = [], bottom = [];
   for (const [key, r] of Object.entries(routes)) {
+    if (!isRouteAllowed(key)) continue;
     if (!r.group) {
       if (key === 'dashboard') top.push(key);
       else bottom.push(key);
-    } else if (groups[r.group]) {
-      groups[r.group].push(key);
+    } else {
+      (groups[r.group] ||= []).push(key);
     }
   }
+  const orderedGroups = [
+    ...GROUP_ORDER.filter(g => groups[g]),
+    ...Object.keys(groups).filter(g => !GROUP_ORDER.includes(g))
+  ];
+
+  const emptyNote = (!state.features || !hasSpecialTools())
+    ? `<div class="mt-3 mx-1 rounded-lg bg-slate-800/60 border border-slate-700 px-3 py-2">
+         <p class="text-[11px] text-slate-400 leading-snug">Prodi Anda belum punya tools khusus. Hubungi admin untuk menambahkannya.</p>
+       </div>`
+    : '';
+
   const html = [top.map(renderNavItem).join('')]
-    .concat(Object.entries(groups).map(([label, items]) => items.length ? navGroup(label, items) : ''))
-    .concat([bottom.map(renderNavItem).join('')])
+    .concat(orderedGroups.map(label => navGroup(label, groups[label])))
+    .concat([bottom.map(renderNavItem).join(''), emptyNote])
     .filter(Boolean).join('');
   document.getElementById('sidebar-nav').innerHTML = html;
   refreshSidebarActive();
@@ -324,11 +386,16 @@ async function tryResumeSession() {
   } catch { return false; }
 }
 
-function showApp() {
+async function showApp() {
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app-shell').classList.remove('hidden');
   document.getElementById('splash').classList.add('hidden');
+  await loadFeatures();
   syncRouteFromHash();
+  if (!isRouteAllowed(String(state.currentRoute).split('/')[0])) {
+    state.currentRoute = 'dashboard';
+    window.location.hash = 'dashboard';
+  }
   renderSidebar();
   renderProfileBadge();
   renderView();
@@ -395,9 +462,19 @@ document.getElementById('mobile-bottom-nav')?.addEventListener('click', (e) => {
 window.addEventListener('hashchange', () => {
   const prev = state.currentRoute;
   syncRouteFromHash();
+  const base = String(state.currentRoute).split('/')[0];
+  if (!isRouteAllowed(base)) {
+    state.currentRoute = 'dashboard';
+    window.location.hash = 'dashboard';
+    toast('Tools ini tidak tersedia untuk program studi Anda.', 'warn');
+    refreshSidebarActive();
+    document.getElementById('page-title').textContent = routes.dashboard.label;
+    renderView();
+    closeMobileSidebar();
+    return;
+  }
   if (state.currentRoute === prev) return;
   refreshSidebarActive();
-  const base = String(state.currentRoute).split('/')[0];
   document.getElementById('page-title').textContent = (routes[base] || routes.dashboard).label;
   renderView();
   closeMobileSidebar();

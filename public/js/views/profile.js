@@ -47,13 +47,10 @@ export async function render(main, ctx) {
         </div>
         <div class="grid md:grid-cols-2 gap-3">
           <div><label class="g-lbl">Fakultas</label>
-            ${u.campus_name && u.campus_name.includes('Santo Thomas')
-            ? `<select name="faculty" id="pf-fac" class="g-inp"></select>`
-            : `<input name="faculty" value="${esc(u.faculty || '')}" class="g-inp" />`}
+            <input value="${esc(u.faculty || '—')}" class="g-inp bg-slate-100 text-slate-600" readonly />
           </div>
           <div><label class="g-lbl">Program Studi</label>
-            <input id="pf-prodi" ${u.campus_name && u.campus_name.includes('Santo Thomas') ? 'list="pf-prodi-list"' : ''} name="study_program" value="${esc(u.study_program || '')}" class="g-inp" />
-            <datalist id="pf-prodi-list"></datalist>
+            <input value="${esc(u.study_program || '—')}" class="g-inp bg-slate-100 text-slate-600" readonly />
           </div>
         </div>
         <div class="grid md:grid-cols-2 gap-3">
@@ -69,7 +66,8 @@ export async function render(main, ctx) {
             </select>
           </div>
         </div>
-        <p class="text-[11px] text-slate-400 bg-slate-50 border border-slate-200 rounded-xl p-3">🏫 Kampus: <b>${esc(u.campus_name || 'UNIKA UST')}</b></p>
+        <p class="text-[11px] text-slate-400 bg-slate-50 border border-slate-200 rounded-xl p-3">🏫 Kampus: <b>${esc(u.campus_name || '—')}</b></p>
+        <p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">🔒 Kampus, fakultas, dan prodi hanya dapat diubah oleh administrator. Hubungi admin jika data akademik Anda perlu diperbarui.</p>
         <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm transition">💾 Simpan Profil</button>
       </form>
     </div>
@@ -307,26 +305,6 @@ export async function render(main, ctx) {
         deleteBtn.disabled = false;
         deleteBtn.textContent = '🗑️ Hapus Foto';
       }
-    });
-  }
-
-  /* ---------- faculty/prodi dropdown for UNIKA UST users ---------- */
-  const facSel = document.getElementById('pf-fac');
-  if (facSel) {
-    api.get('/api/auth/presets').then(({ campuses }) => {
-      const facs = campuses[0].faculties;
-      facSel.innerHTML = `<option value="">— Pilih —</option>` + facs.map((f, i) => `<option value="${i}" ${u.faculty === f.faculty ? 'selected' : ''}>${esc(f.faculty)}</option>`).join('');
-      const list = document.getElementById('pf-prodi-list');
-      function fillProdi() {
-        const f = facs[facSel.value];
-        list.innerHTML = f ? f.programs.map(p => `<option value="${esc(p)}">`).join('') : '';
-      }
-      fillProdi();
-      facSel.addEventListener('change', () => {
-        fillProdi();
-        const f = facs[facSel.value];
-        if (f) document.getElementById('pf-prodi').value = f.programs[0];
-      });
     });
   }
 

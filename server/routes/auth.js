@@ -3,8 +3,14 @@
  */
 const express = require('express');
 const crypto = require('node:crypto');
-const { db, UNIKA_UST_PRESET } = require('../db');
+const { db } = require('../db');
 const { getSetting } = require('../utils/settings');
+const {
+  listPublicPresets,
+  resolveAcademicUnit,
+  getFeaturesForUser,
+  getUserAcademic
+} = require('../utils/campusCatalog');
 const {
   checkAvatarRateLimit,
   handleAvatarUploadMiddleware,
@@ -53,13 +59,14 @@ function requireAuth(req, res, next) {
   next();
 }
 
-/* ---------- GET /api/auth/presets: data fakultas & prodi UNIKA UST ---------- */
+/* ---------- GET /api/auth/presets: kampus → fakultas → prodi ---------- */
 router.get('/presets', (req, res) => {
   res.json({
     campuses: [
-      { id: 'unika-ust', name: 'Universitas Katolik Santo Thomas (UNIKA UST)', medan: true, faculties: UNIKA_UST_PRESET },
+      ...listPublicPresets(),
       { id: 'custom', name: 'Tambah Kampus Baru (Manual Input)' }
-    ]
+    ],
+    allow_custom_campus: getSetting('allow_custom_campus', '1') === '1'
   });
 });
 
@@ -71,7 +78,8 @@ router.post('/register', (req, res) => {
 
   const {
     email, password, full_name, avatar_emoji = '🎓', npm_nim,
-    campus_mode = 'preset', campus_name, faculty, study_program,
+    campus_mode = 'preset', campus_id, faculty_id, program_id,
+    campus_name, faculty, study_program,
     active_semester = 1, target_gpa, expected_graduation_year
   } = req.body;
 
@@ -91,32 +99,43 @@ router.post('/register', (req, res) => {
     return res.status(409).json({ error: 'Email sudah terdaftar. Silakan login.' });
   }
 
-  // Validation for campus mode
+  /* Resolve kampus/fakultas/prodi — mendukung payload ID baru maupun teks lama */
+  let unit;
   if (campus_mode === 'preset') {
-    if (!faculty || !study_program) {
-      return res.status(400).json({ error: 'Fakultas dan Prodi wajib dipilih.' });
+    if (program_id) {
+      unit = resolveAcademicUnit({ campus_id, faculty_id, program_id });
+    } else {
+      if (!faculty || !study_program) {
+        return res.status(400).json({ error: 'Fakultas dan Prodi wajib dipilih.' });
+      }
+      unit = resolveAcademicUnit({
+        campus_name: campus_name || 'Universitas Katolik Santo Thomas (UNIKA UST)',
+        faculty,
+        study_program
+      });
     }
-  } else if (!campus_name) {
-    return res.status(400).json({ error: 'Nama kampus custom wajib diisi.' });
+  } else {
+    if (!campus_name) {
+      return res.status(400).json({ error: 'Nama kampus custom wajib diisi.' });
+    }
+    unit = resolveAcademicUnit({ campus_name, faculty, study_program });
   }
+
+  if (unit.error) return res.status(400).json({ error: unit.error });
 
   const salt = crypto.randomBytes(16).toString('hex');
   const hash = hashPassword(password, salt);
 
-  const resolvedCampus = campus_mode === 'preset'
-    ? 'Universitas Katolik Santo Thomas (UNIKA UST)'
-    : campus_name;
-
   // NOTE: Google OAuth / Apple ID hooks planned for v1.1 (requires provider credentials)
   const info = db.prepare(`
     INSERT INTO users (email, password_hash, salt, full_name, avatar_emoji, npm_nim,
-      campus_name, faculty, study_program, active_semester, target_gpa, expected_graduation_year)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      campus_name, faculty, study_program, campus_id, faculty_id, program_id,
+      active_semester, target_gpa, expected_graduation_year)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     email.toLowerCase(), hash, salt, full_name, avatar_emoji,
-    npm_nim || null, resolvedCampus,
-    campus_mode === 'preset' ? faculty : campus_name ? '' : faculty || null,
-    campus_mode === 'preset' ? study_program : null,
+    npm_nim || null, unit.campus_name, unit.faculty_name, unit.study_program,
+    unit.campus_id, unit.faculty_id, unit.program_id,
     Math.min(Math.max(parseInt(active_semester) || 1, 1), 9),
     parseFloat(target_gpa) || parseFloat(getSetting('default_target_gpa', '3.50')) || 3.5,
     expected_graduation_year ? parseInt(expected_graduation_year) : null
@@ -164,12 +183,31 @@ router.post('/logout', requireAuth, (req, res) => {
 
 /* ---------- GET /api/auth/me ---------- */
 router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: publicUser(req.user) });
+  res.json({
+    user: publicUser(req.user),
+    academic: getUserAcademic(req.user.id)
+  });
+});
+
+/* ---------- GET /api/auth/features: fitur yang tersedia untuk user ---------- */
+router.get('/features', requireAuth, (req, res) => {
+  res.json({
+    features: getFeaturesForUser(req.user),
+    academic: getUserAcademic(req.user.id)
+  });
 });
 
 /* ---------- PUT /api/auth/profile: update student metadata (Phase 0.2) ---------- */
 router.put('/profile', requireAuth, (req, res) => {
-  const allowed = ['full_name', 'avatar_emoji', 'npm_nim', 'faculty', 'study_program',
+  /* Kampus/fakultas/prodi hanya dapat diubah administrator lewat dashboard admin. */
+  const academicFields = ['campus_name', 'campus_id', 'faculty', 'faculty_id', 'study_program', 'program_id'];
+  if (academicFields.some(key => key in req.body)) {
+    return res.status(403).json({
+      error: 'Kampus, fakultas, dan prodi hanya dapat diubah oleh administrator.'
+    });
+  }
+
+  const allowed = ['full_name', 'avatar_emoji', 'npm_nim',
     'active_semester', 'target_gpa', 'expected_graduation_year'];
   const updates = [];
   const values = [];
