@@ -1001,6 +1001,32 @@ async function loadSettings() {
       </span>
     </label>`;
 
+  function logoSection(key, label, description, icon) {
+    const currentLogo = s[key];
+    const hasLogo = currentLogo && currentLogo.length > 0;
+    const preview = hasLogo
+      ? `<img src="${esc(currentLogo)}" alt="${esc(label)}" class="h-20 w-20 object-contain" />`
+      : '<div class="h-20 w-20 flex items-center justify-center text-slate-300 text-xs">Kosong</div>';
+    return `
+      <section class="a-card p-5 space-y-4">
+        <h3 class="font-extrabold text-slate-800">${icon} ${label}</h3>
+        <p class="text-xs text-slate-500">${esc(description)}</p>
+        <div class="flex items-center gap-4">
+          <div class="shrink-0">${preview}</div>
+          <div class="flex-1 min-w-0">
+            <form class="logo-upload-form" data-key="${key}" enctype="multipart/form-data">
+              <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="a-input file:mr-3 file:border-0 file:bg-indigo-50 file:text-indigo-700 file:px-3 file:py-1.5 file:rounded-lg file:text-xs file:font-bold" />
+              <p class="text-[10px] text-slate-400 mt-1">Format: PNG, JPG, WebP, SVG. Maksimal 2MB.</p>
+              <div class="flex gap-2 mt-3">
+                <button type="submit" class="a-btn a-btn-primary a-btn-sm">⬆️ Unggah</button>
+                ${hasLogo ? `<button type="button" class="a-btn a-btn-danger a-btn-sm logo-delete" data-key="${key}">🗑️ Hapus</button>` : ''}
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>`;
+  }
+
   main.innerHTML = `
     <div class="mb-5">
       <h2 class="text-xl font-extrabold text-slate-800">Pengaturan Website</h2>
@@ -1052,6 +1078,11 @@ async function loadSettings() {
       </section>
     </form>
 
+    <div class="grid lg:grid-cols-2 gap-5 mt-5">
+      ${logoSection('site_logo', 'Logo Website', 'Logo ini akan ditampilkan di header, splash screen, dan favicon situs.', '🌐')}
+      ${logoSection('campus_logo', 'Logo Kampus', 'Logo ini akan ditampilkan di Kartu Mahasiswa dan halaman profil.', '🏫')}
+    </div>
+
     <section class="a-card p-5 mt-5 max-w-2xl">
       <h3 class="font-extrabold text-slate-800">🔑 Keamanan Akun Admin</h3>
       <p class="text-xs text-slate-500 mt-1">Ganti password akun administrator yang sedang digunakan.</p>
@@ -1099,6 +1130,62 @@ async function loadSettings() {
       btn.disabled = false;
       btn.textContent = '💾 Simpan Semua Pengaturan';
     }
+  });
+
+  // Logo upload handlers
+  main.querySelectorAll('.logo-upload-form').forEach(formEl => {
+    formEl.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const key = formEl.dataset.key;
+      const fileInput = formEl.querySelector('input[type="file"]');
+      const file = fileInput.files?.[0];
+      if (!file) return toast('Pilih file logo terlebih dahulu.', 'warn');
+      
+      const submitBtn = formEl.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Mengunggah…';
+      
+      const fd = new FormData();
+      fd.append('logo', file);
+      
+      try {
+        const res = await request(`/api/admin/settings/logo/${key === 'site_logo' ? 'site' : 'campus'}`, {
+          method: 'POST',
+          form: fd
+        });
+        toast(res.message || 'Logo berhasil diunggah.');
+        fileInput.value = '';
+        loadSettings(); // Reload to show updated logo
+      } catch (err) {
+        toast(err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '⬆️ Unggah';
+      }
+    });
+  });
+
+  // Logo delete handlers
+  main.querySelectorAll('.logo-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const key = btn.dataset.key;
+      if (!confirm(`Hapus ${key === 'site_logo' ? 'logo website' : 'logo kampus'}?`)) return;
+      
+      btn.disabled = true;
+      btn.textContent = '⏳ Menghapus…';
+      
+      try {
+        const res = await request(`/api/admin/settings/logo/${key === 'site_logo' ? 'site' : 'campus'}`, {
+          method: 'DELETE'
+        });
+        toast(res.message || 'Logo berhasil dihapus.');
+        loadSettings(); // Reload to show updated state
+      } catch (err) {
+        toast(err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '🗑️ Hapus';
+      }
+    });
   });
 
   document.getElementById('admin-password-form').addEventListener('submit', async (e) => {

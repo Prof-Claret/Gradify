@@ -170,7 +170,9 @@ const DEFAULT_APP_SETTINGS = {
   maintenance_message: 'Gradify sedang dalam perbaikan. Silakan kembali beberapa saat lagi.',
   allow_custom_campus: '1',
   default_target_gpa: '3.50',
-  announcement: ''
+  announcement: '',
+  site_logo: '',
+  campus_logo: ''
 };
 
 for (const [key, value] of Object.entries(DEFAULT_APP_SETTINGS)) {

@@ -4,6 +4,7 @@
  */
 const express = require('express');
 const path = require('node:path');
+const fs = require('node:fs');
 const { DB_PATH } = require('./db');
 const { router: authRoutes } = require('./routes/auth');
 const academicsRoutes = require('./routes/academics');
@@ -26,6 +27,41 @@ app.use('/api/admin', adminRoutes);
 
 /* Public app configuration (branding, registration, maintenance) */
 app.get('/api/config', (req, res) => res.json({ config: getPublicConfig() }));
+
+/* ---------- Static logo uploads (site & campus logos) ---------- */
+const LOGO_DIR = path.join(path.dirname(DB_PATH), 'uploads', 'logos');
+const LOGO_MIME = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml'
+};
+const VALID_LOGO_FILENAME = /^(site|campus)-logo-\d+\.(png|jpe?g|webp|svg)$/;
+
+app.get('/uploads/logos/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  if (!VALID_LOGO_FILENAME.test(filename)) {
+    return res.status(400).json({ error: 'Nama file logo tidak valid.' });
+  }
+
+  const targetPath = path.resolve(LOGO_DIR, filename);
+  if (!targetPath.startsWith(path.resolve(LOGO_DIR))) {
+    return res.status(403).json({ error: 'Akses ditolak.' });
+  }
+  if (!fs.existsSync(targetPath)) {
+    return res.status(404).json({ error: 'Logo tidak ditemukan.' });
+  }
+
+  const ext = path.extname(filename).toLowerCase();
+  res.setHeader('Content-Type', LOGO_MIME[ext] || 'application/octet-stream');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // SVG dapat berisi skrip — sandbox CSP menetralkannya saat dirender sebagai <img>.
+  res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+  res.sendFile(targetPath);
+});
 
 /* Health check */
 app.get('/api/health', (req, res) => res.json({ status: 'ok', app: 'Gradify', version: '1.0.0' }));

@@ -72,7 +72,9 @@ function getPublicConfig() {
     maintenance_message: s.maintenance_message,
     allow_custom_campus: s.allow_custom_campus === '1',
     default_target_gpa: Number(s.default_target_gpa) || 3.5,
-    announcement: s.announcement || ''
+    announcement: s.announcement || '',
+    site_logo: s.site_logo || '',
+    campus_logo: s.campus_logo || ''
   };
 }
 

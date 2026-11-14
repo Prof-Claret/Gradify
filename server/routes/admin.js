@@ -42,6 +42,16 @@ const backupUpload = multer({
   limits: { fileSize: 50 * 1024 * 1024, files: 1 }
 });
 
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Format file tidak didukung. Gunakan PNG, JPG, WebP, atau SVG.'));
+  }
+});
+
 /* ============================================================
  * HELPERS
  * ============================================================ */
@@ -567,6 +577,86 @@ router.put('/settings', (req, res) => {
 
   const updated = setSettings(patch);
   res.json({ settings: updated, message: 'Pengaturan berhasil disimpan.' });
+});
+
+/* ============================================================
+ * LOGO UPLOAD
+ * ============================================================ */
+const LOGO_EXTENSIONS = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+  'image/svg+xml': '.svg'
+};
+
+function saveLogoFile(buffer, prefix, mimetype) {
+  const uploadDir = path.join(path.dirname(DB_PATH), 'uploads', 'logos');
+  fs.mkdirSync(uploadDir, { recursive: true });
+  const ext = LOGO_EXTENSIONS[mimetype] || '.png';
+  const filename = `${prefix}-${Date.now()}${ext}`;
+  const filepath = path.join(uploadDir, filename);
+  fs.writeFileSync(filepath, buffer);
+  return `/uploads/logos/${filename}`;
+}
+
+function deleteLogoFile(logoUrl) {
+  if (!logoUrl || !logoUrl.startsWith('/uploads/logos/')) return;
+  try {
+    const filepath = path.join(path.dirname(DB_PATH), logoUrl);
+    if (fs.existsSync(filepath)) fs.rmSync(filepath, { force: true });
+  } catch { /* ignore */ }
+}
+
+router.post('/settings/logo/site', logoUpload.single('logo'), (req, res) => {
+  if (!req.file?.buffer) {
+    return res.status(400).json({ error: 'Pilih file logo terlebih dahulu.' });
+  }
+  try {
+    const currentSettings = getSettings();
+    if (currentSettings.site_logo) deleteLogoFile(currentSettings.site_logo);
+    const logoUrl = saveLogoFile(req.file.buffer, 'site-logo', req.file.mimetype);
+    const updated = setSettings({ site_logo: logoUrl });
+    res.json({ settings: updated, message: 'Logo situs berhasil diunggah.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Gagal menyimpan logo situs.' });
+  }
+});
+
+router.post('/settings/logo/campus', logoUpload.single('logo'), (req, res) => {
+  if (!req.file?.buffer) {
+    return res.status(400).json({ error: 'Pilih file logo terlebih dahulu.' });
+  }
+  try {
+    const currentSettings = getSettings();
+    if (currentSettings.campus_logo) deleteLogoFile(currentSettings.campus_logo);
+    const logoUrl = saveLogoFile(req.file.buffer, 'campus-logo', req.file.mimetype);
+    const updated = setSettings({ campus_logo: logoUrl });
+    res.json({ settings: updated, message: 'Logo kampus berhasil diunggah.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Gagal menyimpan logo kampus.' });
+  }
+});
+
+router.delete('/settings/logo/site', (req, res) => {
+  try {
+    const currentSettings = getSettings();
+    if (currentSettings.site_logo) deleteLogoFile(currentSettings.site_logo);
+    const updated = setSettings({ site_logo: '' });
+    res.json({ settings: updated, message: 'Logo situs berhasil dihapus.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Gagal menghapus logo situs.' });
+  }
+});
+
+router.delete('/settings/logo/campus', (req, res) => {
+  try {
+    const currentSettings = getSettings();
+    if (currentSettings.campus_logo) deleteLogoFile(currentSettings.campus_logo);
+    const updated = setSettings({ campus_logo: '' });
+    res.json({ settings: updated, message: 'Logo kampus berhasil dihapus.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Gagal menghapus logo kampus.' });
+  }
 });
 
 /* ============================================================

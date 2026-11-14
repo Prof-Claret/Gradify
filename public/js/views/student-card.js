@@ -77,11 +77,14 @@ function frontCard(card) {
   const photo = s.avatar_url
     ? `<img src="${esc(s.avatar_url)}" alt="Foto ${esc(s.full_name)}" />`
     : `<span class="ktm-photo-emoji">${esc(s.avatar_emoji || '🎓')}</span>`;
+  
+  // Get campus logo from config if available
+  const campusLogo = window.GradifyConfig?.campus_logo || '';
 
   return `<article class="ktm-card ktm-front" id="ktm-card-front" data-side="front">
     <div class="ktm-watermark" aria-hidden="true">🎓</div>
     <header class="ktm-head">
-      <div class="ktm-logo">🎓</div>
+      <div class="ktm-logo">${campusLogo ? `<img src="${esc(campusLogo)}" alt="Logo Kampus" />` : '🎓'}</div>
       <div class="ktm-head-txt">
         <p class="ktm-univ">${esc(s.campus_name)}</p>
         <p class="ktm-title">KARTU TANDA MAHASISWA</p>
@@ -496,14 +499,17 @@ const injectStyles = () => {
   .ktm-logo {
     width: 7.4mm;
     height: 7.4mm;
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 3.6mm;
     flex-shrink: 0;
-    background: rgba(255, 255, 255, .17);
-    border: .35mm solid rgba(255, 255, 255, .5);
+  }
+  .ktm-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
   }
   .ktm-head-txt { min-width: 0; flex: 1; }
   .ktm-univ {

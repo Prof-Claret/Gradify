@@ -46,7 +46,9 @@ const state = {
     maintenance_message: '',
     allow_custom_campus: true,
     default_target_gpa: 3.5,
-    announcement: ''
+    announcement: '',
+    site_logo: '',
+    campus_logo: ''
   }
 };
 
@@ -63,6 +65,9 @@ export async function loadConfig() {
 
 function applyConfig() {
   const c = state.config;
+  // Expose config globally for other views (e.g., student-card)
+  window.GradifyConfig = c;
+  
   document.title = `${c.site_name} — ${c.site_tagline}`;
   const splashName = document.getElementById('splash-name');
   const splashTagline = document.getElementById('splash-tagline');
@@ -70,6 +75,18 @@ function applyConfig() {
   if (splashName) splashName.textContent = c.site_name;
   if (splashTagline) splashTagline.textContent = c.site_tagline;
   if (brandName) brandName.textContent = c.site_name;
+
+  // Apply site logo to splash screen and sidebar brand
+  if (c.site_logo) {
+    const splashLogo = document.getElementById('splash-logo');
+    if (splashLogo) {
+      splashLogo.innerHTML = `<img src="${esc(c.site_logo)}" alt="${esc(c.site_name)}" class="mx-auto h-24 w-24 object-contain drop-shadow-lg" />`;
+    }
+    const brandLogo = document.getElementById('brand-logo');
+    if (brandLogo) {
+      brandLogo.innerHTML = `<img src="${esc(c.site_logo)}" alt="${esc(c.site_name)}" class="h-8 w-8 object-contain" />`;
+    }
+  }
 
   const ann = document.getElementById('global-announcement');
   if (ann) {
