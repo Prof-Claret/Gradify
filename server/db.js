@@ -142,6 +142,13 @@ CREATE TABLE IF NOT EXISTS app_settings (
   value TEXT,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS campus_logos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campus_name TEXT UNIQUE NOT NULL,
+  logo_url TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now'))
+);
 `);
 
 /* Migrate existing DBs that predate grading weight columns */

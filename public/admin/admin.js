@@ -987,7 +987,10 @@ async function loadBackup() {
  * SETTINGS
  * ============================================================ */
 async function loadSettings() {
-  const { settings: s } = await request('/api/admin/settings');
+  const [{ settings: s }, { campuses }] = await Promise.all([
+    request('/api/admin/settings'),
+    request('/api/admin/campuses')
+  ]);
   const main = document.getElementById('admin-main');
   const currentGpa = Number(s.default_target_gpa || 3.5).toFixed(2);
 
@@ -1025,6 +1028,122 @@ async function loadSettings() {
           </div>
         </div>
       </section>`;
+  }
+
+  function campusPanelHtml(c) {
+    const hasLogo = c.logo_url && c.logo_url.length > 0;
+    const preview = hasLogo
+      ? `<img src="${esc(c.logo_url)}" alt="Logo ${esc(c.campus_name)}" class="h-20 w-20 object-contain" />`
+      : '<div class="h-20 w-20 flex items-center justify-center text-slate-300 text-[10px] text-center leading-tight">Belum ada logo</div>';
+    return `
+      <div class="flex flex-wrap items-center gap-4 border border-slate-200 rounded-xl p-4 bg-slate-50">
+        <div class="shrink-0">${preview}</div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-bold text-slate-800 truncate">${esc(c.campus_name)}</p>
+          <p class="text-[10px] text-slate-400">${c.user_count} mahasiswa terdaftar</p>
+          <form class="campus-logo-form mt-2" enctype="multipart/form-data">
+            <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="a-input file:mr-3 file:border-0 file:bg-indigo-50 file:text-indigo-700 file:px-3 file:py-1.5 file:rounded-lg file:text-xs file:font-bold" />
+            <p class="text-[10px] text-slate-400 mt-1">Format: PNG, JPG, WebP, SVG. Maksimal 2MB.</p>
+            <div class="flex gap-2 mt-2">
+              <button type="submit" class="a-btn a-btn-primary a-btn-sm">⬆️ Unggah Logo</button>
+              ${hasLogo ? '<button type="button" class="a-btn a-btn-danger a-btn-sm campus-logo-delete">🗑️ Hapus</button>' : ''}
+            </div>
+          </form>
+        </div>
+      </div>`;
+  }
+
+  function campusLogoSection(campuses) {
+    if (campuses.length === 0) {
+      return `
+        <section class="a-card p-5 space-y-4 lg:col-span-2">
+          <h3 class="font-extrabold text-slate-800">🏫 Logo Kampus (Per Kampus)</h3>
+          <p class="text-xs text-slate-500 mt-1">Setiap kampus punya logo sendiri. Logo akan muncul di Kartu Tanda Mahasiswa sesuai nama kampus mahasiswa.</p>
+          ${emptyState('🏫', 'Belum ada kampus terdaftar', 'Kampus akan muncul otomatis dari data pengguna.')}
+        </section>`;
+    }
+
+    return `
+      <section class="a-card p-5 space-y-4 lg:col-span-2">
+        <div>
+          <h3 class="font-extrabold text-slate-800">🏫 Logo Kampus (Per Kampus)</h3>
+          <p class="text-xs text-slate-500 mt-1">Pilih kampus terlebih dahulu, lalu unggah atau ganti logo kampus tersebut. Logo akan muncul di Kartu Tanda Mahasiswa sesuai nama kampus mahasiswa.</p>
+        </div>
+        <div>
+          <label class="a-label">Pilih Kampus</label>
+          <select id="campus-logo-select" class="a-input sm:max-w-md">
+            <option value="">— Pilih Kampus —</option>
+            ${campuses.map(c => `<option value="${esc(c.campus_name)}">${esc(c.campus_name)} (${c.user_count} mahasiswa)</option>`).join('')}
+          </select>
+        </div>
+        <div id="campus-logo-panel"></div>
+      </section>`;
+  }
+
+  async function showCampusPanel(campusName) {
+    const panel = document.getElementById('campus-logo-panel');
+    if (!panel) return;
+    if (!campusName) { panel.innerHTML = ''; return; }
+
+    panel.innerHTML = loading('Memuat logo kampus…');
+    try {
+      const { campuses } = await request('/api/admin/campuses');
+      const c = campuses.find(x => x.campus_name === campusName);
+      if (!c) {
+        panel.innerHTML = '<p class="text-xs text-slate-400">Kampus tidak ditemukan.</p>';
+        return;
+      }
+      panel.innerHTML = campusPanelHtml(c);
+
+      const formEl = panel.querySelector('.campus-logo-form');
+      formEl.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fileInput = formEl.querySelector('input[type="file"]');
+        const file = fileInput.files?.[0];
+        if (!file) return toast('Pilih file logo terlebih dahulu.', 'warn');
+
+        const submitBtn = formEl.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '⏳ Mengunggah…';
+
+        const fd = new FormData();
+        fd.append('campus_name', c.campus_name);
+        fd.append('logo', file);
+
+        try {
+          const res = await request('/api/admin/campuses/logo', { method: 'POST', form: fd });
+          toast(res.message || 'Logo kampus berhasil diunggah.');
+          showCampusPanel(c.campus_name); // Refresh panel dengan logo baru
+        } catch (err) {
+          toast(err.message, 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = '⬆️ Unggah Logo';
+        }
+      });
+
+      panel.querySelector('.campus-logo-delete')?.addEventListener('click', async (e) => {
+        const btn = e.currentTarget;
+        if (!confirm(`Hapus logo untuk ${c.campus_name}?`)) return;
+
+        btn.disabled = true;
+        btn.textContent = '⏳ Menghapus…';
+
+        try {
+          const res = await request(`/api/admin/campuses/logo?campus=${encodeURIComponent(c.campus_name)}`, {
+            method: 'DELETE'
+          });
+          toast(res.message || 'Logo kampus berhasil dihapus.');
+          showCampusPanel(c.campus_name); // Refresh panel
+        } catch (err) {
+          toast(err.message, 'error');
+          btn.disabled = false;
+          btn.textContent = '🗑️ Hapus';
+        }
+      });
+    } catch (err) {
+      panel.innerHTML = '';
+      toast(err.message, 'error');
+    }
   }
 
   main.innerHTML = `
@@ -1080,7 +1199,10 @@ async function loadSettings() {
 
     <div class="grid lg:grid-cols-2 gap-5 mt-5">
       ${logoSection('site_logo', 'Logo Website', 'Logo ini akan ditampilkan di header, splash screen, dan favicon situs.', '🌐')}
-      ${logoSection('campus_logo', 'Logo Kampus', 'Logo ini akan ditampilkan di Kartu Mahasiswa dan halaman profil.', '🏫')}
+    </div>
+
+    <div class="mt-5">
+      ${campusLogoSection(campuses)}
     </div>
 
     <section class="a-card p-5 mt-5 max-w-2xl">
@@ -1163,6 +1285,11 @@ async function loadSettings() {
         submitBtn.textContent = '⬆️ Unggah';
       }
     });
+  });
+
+  // Logo kampus: dropdown pemilihan kampus → tampilkan panel logonya
+  document.getElementById('campus-logo-select')?.addEventListener('change', (e) => {
+    showCampusPanel(e.target.value);
   });
 
   // Logo delete handlers

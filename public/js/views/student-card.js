@@ -72,14 +72,14 @@ function fmtLongDate(iso) {
 /* ============================================================
  * CARD MARKUP
  * ============================================================ */
-function frontCard(card) {
+function frontCard(card, campusLogoMap) {
   const s = card.student;
   const photo = s.avatar_url
     ? `<img src="${esc(s.avatar_url)}" alt="Foto ${esc(s.full_name)}" />`
     : `<span class="ktm-photo-emoji">${esc(s.avatar_emoji || '🎓')}</span>`;
-  
-  // Get campus logo from config if available
-  const campusLogo = window.GradifyConfig?.campus_logo || '';
+
+  // Logo sesuai nama kampus mahasiswa (fallback: emoji)
+  const campusLogo = (campusLogoMap || {})[s.campus_name] || '';
 
   return `<article class="ktm-card ktm-front" id="ktm-card-front" data-side="front">
     <div class="ktm-watermark" aria-hidden="true">🎓</div>
@@ -171,7 +171,12 @@ function backCard(card) {
  * ============================================================ */
 export async function render(main, ctx) {
   const { api, navigate } = ctx;
-  const card = await api.get('/api/academics/student-card');
+  const [card, campusLogos] = await Promise.all([
+    api.get('/api/academics/student-card'),
+    fetch('/api/campus-logos', { headers: { Accept: 'application/json' } })
+      .then(r => r.ok ? r.json() : { logos: {} })
+      .catch(() => ({ logos: {} }))
+  ]);
   const s = card.student;
 
   main.innerHTML = `
@@ -215,7 +220,7 @@ export async function render(main, ctx) {
         </div>
 
         <div id="ktm-print-root" class="ktm-stage">
-          ${frontCard(card)}
+          ${frontCard(card, campusLogos.logos)}
           ${backCard(card)}
         </div>
 

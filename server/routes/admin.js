@@ -18,6 +18,9 @@ const {
   BOOLEAN_SETTINGS, getSettings, setSettings, ensureDefaultSettings
 } = require('../utils/settings');
 const { deleteOldAvatarFile } = require('../utils/avatarSecurity');
+const {
+  listCampuses, getCampusLogo, setCampusLogo, deleteCampusLogo
+} = require('../utils/campusLogos');
 
 const router = express.Router();
 const packageJson = require('../../package.json');
@@ -30,11 +33,12 @@ const DATA_TABLES = [
   'notes',
   'skripsi_milestones',
   'portfolio_items',
-  'app_settings'
+  'app_settings',
+  'campus_logos'
 ];
 const RESET_SEQUENCE_TABLES = [
   'users', 'semesters', 'courses', 'tasks', 'notes',
-  'skripsi_milestones', 'portfolio_items'
+  'skripsi_milestones', 'portfolio_items', 'campus_logos'
 ];
 
 const backupUpload = multer({
@@ -593,7 +597,8 @@ function saveLogoFile(buffer, prefix, mimetype) {
   const uploadDir = path.join(path.dirname(DB_PATH), 'uploads', 'logos');
   fs.mkdirSync(uploadDir, { recursive: true });
   const ext = LOGO_EXTENSIONS[mimetype] || '.png';
-  const filename = `${prefix}-${Date.now()}${ext}`;
+  const suffix = crypto.randomBytes(4).toString('hex');
+  const filename = `${prefix}-${Date.now()}-${suffix}${ext}`;
   const filepath = path.join(uploadDir, filename);
   fs.writeFileSync(filepath, buffer);
   return `/uploads/logos/${filename}`;
@@ -622,21 +627,6 @@ router.post('/settings/logo/site', logoUpload.single('logo'), (req, res) => {
   }
 });
 
-router.post('/settings/logo/campus', logoUpload.single('logo'), (req, res) => {
-  if (!req.file?.buffer) {
-    return res.status(400).json({ error: 'Pilih file logo terlebih dahulu.' });
-  }
-  try {
-    const currentSettings = getSettings();
-    if (currentSettings.campus_logo) deleteLogoFile(currentSettings.campus_logo);
-    const logoUrl = saveLogoFile(req.file.buffer, 'campus-logo', req.file.mimetype);
-    const updated = setSettings({ campus_logo: logoUrl });
-    res.json({ settings: updated, message: 'Logo kampus berhasil diunggah.' });
-  } catch (err) {
-    res.status(500).json({ error: 'Gagal menyimpan logo kampus.' });
-  }
-});
-
 router.delete('/settings/logo/site', (req, res) => {
   try {
     const currentSettings = getSettings();
@@ -648,12 +638,51 @@ router.delete('/settings/logo/site', (req, res) => {
   }
 });
 
-router.delete('/settings/logo/campus', (req, res) => {
+/* ============================================================
+ * CAMPUS LOGOS — satu logo per nama kampus
+ * ============================================================ */
+router.get('/campuses', (req, res) => {
+  res.json({ campuses: listCampuses() });
+});
+
+router.post('/campuses/logo', logoUpload.single('logo'), (req, res) => {
+  const campusName = String(req.body?.campus_name || '').trim();
+  if (!campusName) {
+    return res.status(400).json({ error: 'Nama kampus wajib dipilih.' });
+  }
+  if (campusName.length > 120) {
+    return res.status(400).json({ error: 'Nama kampus terlalu panjang.' });
+  }
+  if (!req.file?.buffer) {
+    return res.status(400).json({ error: 'Pilih file logo terlebih dahulu.' });
+  }
+
   try {
-    const currentSettings = getSettings();
-    if (currentSettings.campus_logo) deleteLogoFile(currentSettings.campus_logo);
-    const updated = setSettings({ campus_logo: '' });
-    res.json({ settings: updated, message: 'Logo kampus berhasil dihapus.' });
+    deleteLogoFile(getCampusLogo(campusName));
+    const logoUrl = saveLogoFile(req.file.buffer, 'campus-logo', req.file.mimetype);
+    setCampusLogo(campusName, logoUrl);
+    res.json({
+      campus_name: campusName,
+      logo_url: logoUrl,
+      message: `Logo untuk ${campusName} berhasil diunggah.`
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Gagal menyimpan logo kampus.' });
+  }
+});
+
+router.delete('/campuses/logo', (req, res) => {
+  const campusName = String(req.query.campus || '').trim();
+  if (!campusName) {
+    return res.status(400).json({ error: 'Nama kampus wajib disertakan.' });
+  }
+  try {
+    const removed = deleteCampusLogo(campusName);
+    if (!removed) {
+      return res.status(404).json({ error: 'Logo kampus tidak ditemukan.' });
+    }
+    deleteLogoFile(removed);
+    res.json({ ok: true, message: `Logo untuk ${campusName} berhasil dihapus.` });
   } catch (err) {
     res.status(500).json({ error: 'Gagal menghapus logo kampus.' });
   }

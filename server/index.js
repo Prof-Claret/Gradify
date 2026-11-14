@@ -12,6 +12,7 @@ const notesRoutes = require('./routes/notes');
 const lifeRoutes = require('./routes/life');
 const adminRoutes = require('./routes/admin');
 const { getPublicConfig } = require('./utils/settings');
+const { getCampusLogoMap } = require('./utils/campusLogos');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,6 +29,9 @@ app.use('/api/admin', adminRoutes);
 /* Public app configuration (branding, registration, maintenance) */
 app.get('/api/config', (req, res) => res.json({ config: getPublicConfig() }));
 
+/* Public campus logo map: { "Nama Kampus": "/uploads/logos/..." } */
+app.get('/api/campus-logos', (req, res) => res.json({ logos: getCampusLogoMap() }));
+
 /* ---------- Static logo uploads (site & campus logos) ---------- */
 const LOGO_DIR = path.join(path.dirname(DB_PATH), 'uploads', 'logos');
 const LOGO_MIME = {
@@ -37,7 +41,7 @@ const LOGO_MIME = {
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml'
 };
-const VALID_LOGO_FILENAME = /^(site|campus)-logo-\d+\.(png|jpe?g|webp|svg)$/;
+const VALID_LOGO_FILENAME = /^(site|campus)-logo-\d+(?:-[a-f0-9]+)?\.(png|jpe?g|webp|svg)$/;
 
 app.get('/uploads/logos/:filename', (req, res) => {
   const filename = path.basename(req.params.filename);
