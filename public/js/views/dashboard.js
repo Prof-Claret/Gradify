@@ -195,9 +195,7 @@ function wireEvents(api, toast, navigate, ctx) {
 
   document.getElementById('q-add-task').addEventListener('click', () => openQuickTask(api, toast));
   document.getElementById('goto-courses').addEventListener('click', () => navigate('courses'));
-  document.getElementById('goto-tasks').addEventListener('click', () => {
-    document.getElementById('task-section').scrollIntoView({ behavior: 'smooth' });
-  });
+  document.getElementById('goto-tasks').addEventListener('click', () => navigate('tugas'));
   document.getElementById('q-check-promote').addEventListener('click', async () => {
     if (confirm('Naik ke semester berikutnya? Semester matkul saat ini akan diarsipkan (Transkrip tetap tersimpan).')) {
       try {

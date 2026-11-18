@@ -20,6 +20,11 @@ const FEATURES = [
   { key: 'student-card', label: 'Kartu Mahasiswa', icon: '🪪', group: 'Akademik', module: '/js/views/student-card.js', description: 'KTM digital siap cetak', is_core: 1, is_general: 0, sort_order: 60 },
   { key: 'calculator', label: 'Kalkulator Ilmiah', icon: '🧮', group: 'Umum', module: '/js/views/calculator.js', description: 'Kalkulator ilmiah & simbol Yunani', is_core: 0, is_general: 1, sort_order: 100 },
 
+  { key: 'presensi', label: 'Presensi', icon: '✅', group: 'Kampus', module: '/js/views/presensi.js', description: 'Catat dan rekap kehadiran per mata kuliah', is_core: 0, is_general: 1, sort_order: 65 },
+  { key: 'tugas', label: 'Tugas & Upload', icon: '📤', group: 'Kampus', module: '/js/views/tugas.js', description: 'Kelola tugas, lampiran soal, dan unggah jawaban', is_core: 0, is_general: 1, sort_order: 66 },
+  { key: 'elearning', label: 'E-Learning', icon: '🎓', group: 'Kampus', module: '/js/views/elearning.js', description: 'Materi kuliah, jadwal ujian, dan pengumuman', is_core: 0, is_general: 1, sort_order: 67 },
+  { key: 'siak', label: 'SIAK', icon: '🏛️', group: 'Kampus', module: '/js/views/siak.js', description: 'KRS, kalender akademik, dan ringkasan studi', is_core: 0, is_general: 1, sort_order: 68 },
+
   { key: 'cs-toolkit', label: 'CS Math Toolkit', icon: '🛠️', group: 'Toolkit CS', module: '/js/views/toolkit.js', description: 'Sistem bilangan, matriks, kalkulus, statistik', is_core: 0, is_general: 0, sort_order: 200 },
   { key: 'discrete-math', label: 'Matematika Diskrit', icon: '🔗', group: 'Toolkit CS', module: '/js/views/discrete.js', description: 'Logika, himpunan, graf, kombinatorika', is_core: 0, is_general: 0, sort_order: 210 },
   { key: 'dev-tools', label: 'Dev Tools', icon: '💻', group: 'Toolkit CS', module: '/js/views/devtools.js', description: 'SQL, regex, CIDR, dan Big-O', is_core: 0, is_general: 0, sort_order: 220 },

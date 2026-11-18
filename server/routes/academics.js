@@ -3,7 +3,10 @@
  */
 const express = require('express');
 const crypto = require('node:crypto');
-const { db, computeIps, maxSksForIps, gradeToPoint } = require('../db');
+const fs = require('node:fs');
+const path = require('node:path');
+const multer = require('multer');
+const { db, DB_PATH, computeIps, maxSksForIps, gradeToPoint } = require('../db');
 const { requireAuth } = require('./auth');
 
 const router = express.Router();
@@ -12,6 +15,76 @@ router.use(requireAuth);
 /* Secret used to derive a stable KTM verification code.
  * Set GRADIFY_CARD_SECRET in production to keep codes unguessable. */
 const CARD_SECRET = process.env.GRADIFY_CARD_SECRET || 'gradify-ktm-v1';
+
+/* ============================================================
+ * UPLOAD (tugas, materi kuliah)
+ * ============================================================ */
+const FILE_DIR = path.join(path.dirname(DB_PATH), 'uploads', 'files');
+const FILE_EXT = {
+  'application/pdf': '.pdf',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  'application/vnd.ms-powerpoint': '.ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/webp': '.webp',
+  'text/plain': '.txt',
+  'text/csv': '.csv',
+  'application/zip': '.zip',
+  'application/vnd.rar': '.rar',
+  'application/x-7z-compressed': '.7z'
+};
+
+const fileUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (FILE_EXT[file.mimetype]) cb(null, true);
+    else cb(new Error('Format file tidak didukung. Gunakan PDF, DOC/DOCX, XLS/XLSX, PPT/PPTX, gambar, TXT, CSV, atau ZIP.'));
+  }
+});
+
+/** Terima satu file dari multipart, kembalikan { url, name } atau null. */
+function receiveFile(req, res) {
+  return new Promise((resolve) => {
+    fileUpload.single('file')(req, res, (err) => {
+      if (err) {
+        res.status(400).json({ error: err.message || 'Gagal mengunggah file.' });
+        return resolve(undefined);
+      }
+      if (!req.file) return resolve(null);
+      fs.mkdirSync(FILE_DIR, { recursive: true });
+      const ext = FILE_EXT[req.file.mimetype] || '.bin';
+      const filename = `u${req.user.id}-${crypto.randomBytes(8).toString('hex')}${ext}`;
+      fs.writeFileSync(path.join(FILE_DIR, filename), req.file.buffer);
+      resolve({
+        url: `/uploads/files/${filename}`,
+        name: String(req.file.originalname || filename).slice(0, 180)
+      });
+    });
+  });
+}
+
+/** Hapus file upload milik user (hanya dari folder files & pola nama kita). */
+function removeFile(url) {
+  if (!url || !url.startsWith('/uploads/files/')) return;
+  const filename = path.basename(url);
+  if (!/^u\d+-[a-f0-9]{16}\.[a-z0-9]+$/i.test(filename)) return;
+  try { fs.unlinkSync(path.join(FILE_DIR, filename)); } catch { /* sudah tidak ada */ }
+}
+
+function courseOfUser(courseId, userId) {
+  if (!courseId) return null;
+  return db.prepare('SELECT * FROM courses WHERE id = ? AND user_id = ?').get(courseId, userId) || null;
+}
+
+function semesterOfUser(semesterId, userId) {
+  if (!semesterId) return null;
+  return db.prepare('SELECT * FROM semesters WHERE id = ? AND user_id = ?').get(semesterId, userId) || null;
+}
 
 function clampWeight(v, fallback) {
   const n = parseInt(v, 10);
@@ -158,6 +231,51 @@ router.delete('/courses/:id', (req, res) => {
 });
 
 /* ============================================================
+ * DOSEN — master data dosen per user (Add / Edit / Delete)
+ * ============================================================ */
+
+// GET /api/academics/dosen — daftar dosen user
+router.get('/dosen', (req, res) => {
+  const rows = db.prepare('SELECT * FROM dosen WHERE user_id = ? ORDER BY nama').all(req.user.id);
+  res.json({ dosen: rows });
+});
+
+// POST /api/academics/dosen — tambah dosen
+router.post('/dosen', (req, res) => {
+  const { nip_nidn, nama, email, telepon } = req.body || {};
+  if (!nama || !nama.trim()) return res.status(400).json({ error: 'Nama dosen wajib diisi.' });
+  const info = db.prepare(`
+    INSERT INTO dosen (user_id, nip_nidn, nama, email, telepon)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(req.user.id, nip_nidn || null, nama.trim(), email || null, telepon || null);
+  res.status(201).json({ ok: true, id: info.lastInsertRowid });
+});
+
+// PUT /api/academics/dosen/:id — edit dosen
+router.put('/dosen/:id', (req, res) => {
+  const d = db.prepare('SELECT * FROM dosen WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!d) return res.status(404).json({ error: 'Dosen tidak ditemukan.' });
+  const { nip_nidn, nama, email, telepon } = req.body || {};
+  if (nama !== undefined && !nama.trim()) return res.status(400).json({ error: 'Nama dosen wajib diisi.' });
+  const updates = [], values = [];
+  if (nip_nidn !== undefined) { updates.push('nip_nidn = ?'); values.push(nip_nidn || null); }
+  if (nama !== undefined) { updates.push('nama = ?'); values.push(nama.trim()); }
+  if (email !== undefined) { updates.push('email = ?'); values.push(email || null); }
+  if (telepon !== undefined) { updates.push('telepon = ?'); values.push(telepon || null); }
+  if (updates.length === 0) return res.status(400).json({ error: 'Tidak ada perubahan.' });
+  db.prepare(`UPDATE dosen SET ${updates.join(', ')} WHERE id = ?`).run(...values, d.id);
+  res.json({ ok: true });
+});
+
+// DELETE /api/academics/dosen/:id — hapus dosen
+router.delete('/dosen/:id', (req, res) => {
+  const d = db.prepare('SELECT * FROM dosen WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!d) return res.status(404).json({ error: 'Dosen tidak ditemukan.' });
+  db.prepare('DELETE FROM dosen WHERE id = ?').run(d.id);
+  res.json({ ok: true });
+});
+
+/* ============================================================
  * TASKS (Phase 1.3)
  * ============================================================ */
 
@@ -225,8 +343,368 @@ router.put('/tasks/:id', (req, res) => {
 
 // DELETE /api/academics/tasks/:id
 router.delete('/tasks/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM tasks WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
-  if (info.changes === 0) return res.status(404).json({ error: 'Tugas tidak ditemukan.' });
+  const t = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!t) return res.status(404).json({ error: 'Tugas tidak ditemukan.' });
+  removeFile(t.attachment_url);
+  removeFile(t.submission_url);
+  db.prepare('DELETE FROM tasks WHERE id = ?').run(t.id);
+  res.json({ ok: true });
+});
+
+/* ---------- Lampiran & jawaban tugas (upload file) ---------- */
+
+// POST /api/academics/tasks/:id/attachment — unggah lampiran/soal
+router.post('/tasks/:id/attachment', async (req, res) => {
+  const t = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!t) return res.status(404).json({ error: 'Tugas tidak ditemukan.' });
+  const file = await receiveFile(req, res);
+  if (file === undefined) return;
+  if (!file) return res.status(400).json({ error: 'Pilih file yang akan diunggah.' });
+  if (t.attachment_url) removeFile(t.attachment_url);
+  db.prepare('UPDATE tasks SET attachment_url = ?, attachment_name = ? WHERE id = ?')
+    .run(file.url, file.name, t.id);
+  res.status(201).json({ ok: true, url: file.url, name: file.name });
+});
+
+// DELETE /api/academics/tasks/:id/attachment
+router.delete('/tasks/:id/attachment', (req, res) => {
+  const t = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!t) return res.status(404).json({ error: 'Tugas tidak ditemukan.' });
+  removeFile(t.attachment_url);
+  db.prepare('UPDATE tasks SET attachment_url = NULL, attachment_name = NULL WHERE id = ?').run(t.id);
+  res.json({ ok: true });
+});
+
+// POST /api/academics/tasks/:id/submission — unggah jawaban tugas
+router.post('/tasks/:id/submission', async (req, res) => {
+  const t = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!t) return res.status(404).json({ error: 'Tugas tidak ditemukan.' });
+  const file = await receiveFile(req, res);
+  if (file === undefined) return;
+  if (!file) return res.status(400).json({ error: 'Pilih file jawaban yang akan diunggah.' });
+  if (t.submission_url) removeFile(t.submission_url);
+  db.prepare(`UPDATE tasks SET submission_url = ?, submission_name = ?, submitted_at = datetime('now') WHERE id = ?`)
+    .run(file.url, file.name, t.id);
+  res.status(201).json({ ok: true, url: file.url, name: file.name });
+});
+
+// DELETE /api/academics/tasks/:id/submission
+router.delete('/tasks/:id/submission', (req, res) => {
+  const t = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!t) return res.status(404).json({ error: 'Tugas tidak ditemukan.' });
+  removeFile(t.submission_url);
+  db.prepare('UPDATE tasks SET submission_url = NULL, submission_name = NULL, submitted_at = NULL WHERE id = ?').run(t.id);
+  res.json({ ok: true });
+});
+
+/* ============================================================
+ * PRESENSI / KEHADIRAN
+ * ============================================================ */
+
+// GET /api/academics/attendance?semester_id=|course_id=
+router.get('/attendance', (req, res) => {
+  const params = [req.user.id];
+  let sql = `SELECT a.*, c.course_name, c.course_code, c.sks
+             FROM attendance a LEFT JOIN courses c ON c.id = a.course_id
+             WHERE a.user_id = ?`;
+  if (req.query.course_id) {
+    sql += ' AND a.course_id = ?'; params.push(req.query.course_id);
+  } else if (req.query.semester_id) {
+    sql += ' AND c.semester_id = ?'; params.push(req.query.semester_id);
+  }
+  sql += ' ORDER BY a.date DESC, a.id DESC';
+  const records = db.prepare(sql).all(...params);
+  const summary = { hadir: 0, izin: 0, sakit: 0, alfa: 0, total: records.length };
+  for (const r of records) if (summary[r.status] !== undefined) summary[r.status]++;
+  summary.percentage = summary.total ? Math.round((summary.hadir / summary.total) * 1000) / 10 : 0;
+  res.json({ records, summary });
+});
+
+// POST /api/academics/attendance — catat/ubah kehadiran (unik per matkul+tanggal)
+router.post('/attendance', (req, res) => {
+  const { course_id, date, status = 'hadir', meeting_no, notes } = req.body || {};
+  const course = courseOfUser(course_id, req.user.id);
+  if (!course) return res.status(404).json({ error: 'Mata kuliah tidak ditemukan.' });
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+    return res.status(400).json({ error: 'Tanggal presensi wajib diisi (YYYY-MM-DD).' });
+  }
+  const st = ['hadir', 'izin', 'sakit', 'alfa'].includes(status) ? status : 'hadir';
+  const meeting = meeting_no === '' || meeting_no == null ? null : Math.max(parseInt(meeting_no, 10) || 1, 1);
+  db.prepare(`
+    INSERT INTO attendance (user_id, course_id, meeting_no, date, status, notes)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, course_id, date) DO UPDATE SET
+      meeting_no = excluded.meeting_no,
+      status = excluded.status,
+      notes = excluded.notes
+  `).run(req.user.id, course.id, meeting, date, st, notes || null);
+  res.status(201).json({ ok: true });
+});
+
+// PUT /api/academics/attendance/:id
+router.put('/attendance/:id', (req, res) => {
+  const a = db.prepare('SELECT * FROM attendance WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!a) return res.status(404).json({ error: 'Presensi tidak ditemukan.' });
+  const allowed = ['meeting_no', 'date', 'status', 'notes'];
+  const updates = [], values = [];
+  for (const key of allowed) {
+    if (key in req.body) {
+      let val = req.body[key];
+      if (key === 'status' && !['hadir', 'izin', 'sakit', 'alfa'].includes(val)) val = 'hadir';
+      if (key === 'meeting_no') val = val === '' || val == null ? null : Math.max(parseInt(val, 10) || 1, 1);
+      if (key === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(String(val))) {
+        return res.status(400).json({ error: 'Format tanggal tidak valid.' });
+      }
+      updates.push(`${key} = ?`); values.push(val);
+    }
+  }
+  if (!updates.length) return res.status(400).json({ error: 'Tidak ada perubahan.' });
+  db.prepare(`UPDATE attendance SET ${updates.join(', ')} WHERE id = ?`).run(...values, a.id);
+  res.json({ ok: true });
+});
+
+// DELETE /api/academics/attendance/:id
+router.delete('/attendance/:id', (req, res) => {
+  const info = db.prepare('DELETE FROM attendance WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  if (!info.changes) return res.status(404).json({ error: 'Presensi tidak ditemukan.' });
+  res.json({ ok: true });
+});
+
+/* ============================================================
+ * MATERI KULIAH (e-learning)
+ * ============================================================ */
+
+router.get('/materials', (req, res) => {
+  const params = [req.user.id];
+  let sql = `SELECT m.*, c.course_name, c.course_code
+             FROM materials m LEFT JOIN courses c ON c.id = m.course_id
+             WHERE m.user_id = ?`;
+  if (req.query.course_id) { sql += ' AND m.course_id = ?'; params.push(req.query.course_id); }
+  else if (req.query.semester_id) { sql += ' AND c.semester_id = ?'; params.push(req.query.semester_id); }
+  sql += ' ORDER BY m.created_at DESC, m.id DESC';
+  res.json({ materials: db.prepare(sql).all(...params) });
+});
+
+router.post('/materials', async (req, res) => {
+  const file = await receiveFile(req, res);
+  if (file === undefined) return;
+  const { title, description, course_id, link_url } = req.body || {};
+  if (!title || !String(title).trim()) {
+    if (file) removeFile(file.url);
+    return res.status(400).json({ error: 'Judul materi wajib diisi.' });
+  }
+  const course = courseOfUser(course_id, req.user.id);
+  const info = db.prepare(`
+    INSERT INTO materials (user_id, course_id, title, description, file_url, file_name, link_url)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(req.user.id, course ? course.id : null, String(title).trim(),
+    description || null, file ? file.url : null, file ? file.name : null,
+    link_url && String(link_url).trim() ? String(link_url).trim() : null);
+  res.status(201).json({ ok: true, id: info.lastInsertRowid });
+});
+
+router.put('/materials/:id', (req, res) => {
+  const m = db.prepare('SELECT * FROM materials WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!m) return res.status(404).json({ error: 'Materi tidak ditemukan.' });
+  const updates = [], values = [];
+  if ('title' in req.body) {
+    if (!String(req.body.title).trim()) return res.status(400).json({ error: 'Judul materi wajib diisi.' });
+    updates.push('title = ?'); values.push(String(req.body.title).trim());
+  }
+  if ('description' in req.body) { updates.push('description = ?'); values.push(req.body.description || null); }
+  if ('link_url' in req.body) { updates.push('link_url = ?'); values.push(req.body.link_url || null); }
+  if ('course_id' in req.body) {
+    const course = courseOfUser(req.body.course_id, req.user.id);
+    updates.push('course_id = ?'); values.push(course ? course.id : null);
+  }
+  if (!updates.length) return res.status(400).json({ error: 'Tidak ada perubahan.' });
+  db.prepare(`UPDATE materials SET ${updates.join(', ')} WHERE id = ?`).run(...values, m.id);
+  res.json({ ok: true });
+});
+
+router.delete('/materials/:id', (req, res) => {
+  const m = db.prepare('SELECT * FROM materials WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!m) return res.status(404).json({ error: 'Materi tidak ditemukan.' });
+  removeFile(m.file_url);
+  db.prepare('DELETE FROM materials WHERE id = ?').run(m.id);
+  res.json({ ok: true });
+});
+
+/* ============================================================
+ * JADWAL UJIAN
+ * ============================================================ */
+
+router.get('/exams', (req, res) => {
+  const params = [req.user.id];
+  let sql = `SELECT e.*, c.course_name, c.course_code
+             FROM exams e LEFT JOIN courses c ON c.id = e.course_id
+             WHERE e.user_id = ?`;
+  if (req.query.semester_id) { sql += ' AND c.semester_id = ?'; params.push(req.query.semester_id); }
+  sql += ' ORDER BY e.exam_date, e.start_time';
+  res.json({ exams: db.prepare(sql).all(...params) });
+});
+
+router.post('/exams', (req, res) => {
+  const { course_id, type = 'UTS', exam_date, start_time, end_time, room, notes } = req.body || {};
+  if (!exam_date) return res.status(400).json({ error: 'Tanggal ujian wajib diisi.' });
+  const course = courseOfUser(course_id, req.user.id);
+  const t = ['UTS', 'UAS', 'Quiz', 'Remedial'].includes(type) ? type : 'UTS';
+  const info = db.prepare(`
+    INSERT INTO exams (user_id, course_id, type, exam_date, start_time, end_time, room, notes)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(req.user.id, course ? course.id : null, t, exam_date,
+    start_time || null, end_time || null, room || null, notes || null);
+  res.status(201).json({ ok: true, id: info.lastInsertRowid });
+});
+
+router.put('/exams/:id', (req, res) => {
+  const e = db.prepare('SELECT * FROM exams WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!e) return res.status(404).json({ error: 'Jadwal ujian tidak ditemukan.' });
+  const updates = [], values = [];
+  for (const key of ['type', 'exam_date', 'start_time', 'end_time', 'room', 'notes']) {
+    if (key in req.body) { updates.push(`${key} = ?`); values.push(req.body[key] || null); }
+  }
+  if ('course_id' in req.body) {
+    const course = courseOfUser(req.body.course_id, req.user.id);
+    updates.push('course_id = ?'); values.push(course ? course.id : null);
+  }
+  if (!updates.length) return res.status(400).json({ error: 'Tidak ada perubahan.' });
+  db.prepare(`UPDATE exams SET ${updates.join(', ')} WHERE id = ?`).run(...values, e.id);
+  res.json({ ok: true });
+});
+
+router.delete('/exams/:id', (req, res) => {
+  const info = db.prepare('DELETE FROM exams WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  if (!info.changes) return res.status(404).json({ error: 'Jadwal ujian tidak ditemukan.' });
+  res.json({ ok: true });
+});
+
+/* ============================================================
+ * KALENDER AKADEMIK
+ * ============================================================ */
+
+router.get('/calendar', (req, res) => {
+  res.json({
+    events: db.prepare('SELECT * FROM calendar_events WHERE user_id = ? ORDER BY start_date, id').all(req.user.id)
+  });
+});
+
+router.post('/calendar', (req, res) => {
+  const { title, description, start_date, end_date, type = 'akademik' } = req.body || {};
+  if (!title || !String(title).trim()) return res.status(400).json({ error: 'Judul agenda wajib diisi.' });
+  if (!start_date) return res.status(400).json({ error: 'Tanggal mulai wajib diisi.' });
+  const t = ['akademik', 'libur', 'ujian', 'registrasi', 'lainnya'].includes(type) ? type : 'akademik';
+  const info = db.prepare(`
+    INSERT INTO calendar_events (user_id, title, description, start_date, end_date, type)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(req.user.id, String(title).trim(), description || null, start_date, end_date || null, t);
+  res.status(201).json({ ok: true, id: info.lastInsertRowid });
+});
+
+router.put('/calendar/:id', (req, res) => {
+  const e = db.prepare('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!e) return res.status(404).json({ error: 'Agenda tidak ditemukan.' });
+  const updates = [], values = [];
+  for (const key of ['title', 'description', 'start_date', 'end_date', 'type']) {
+    if (key in req.body) {
+      if ((key === 'title' || key === 'start_date') && !String(req.body[key] || '').trim()) {
+        return res.status(400).json({ error: `${key === 'title' ? 'Judul' : 'Tanggal mulai'} wajib diisi.` });
+      }
+      updates.push(`${key} = ?`); values.push(req.body[key] || null);
+    }
+  }
+  if (!updates.length) return res.status(400).json({ error: 'Tidak ada perubahan.' });
+  db.prepare(`UPDATE calendar_events SET ${updates.join(', ')} WHERE id = ?`).run(...values, e.id);
+  res.json({ ok: true });
+});
+
+router.delete('/calendar/:id', (req, res) => {
+  const info = db.prepare('DELETE FROM calendar_events WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  if (!info.changes) return res.status(404).json({ error: 'Agenda tidak ditemukan.' });
+  res.json({ ok: true });
+});
+
+/* ============================================================
+ * PENGUMUMAN
+ * ============================================================ */
+
+router.get('/announcements', (req, res) => {
+  res.json({
+    announcements: db.prepare(`
+      SELECT * FROM announcements WHERE user_id = ?
+      ORDER BY is_pinned DESC, published_at DESC, id DESC
+    `).all(req.user.id)
+  });
+});
+
+router.post('/announcements', (req, res) => {
+  const { title, content = '', source, is_pinned } = req.body || {};
+  if (!title || !String(title).trim()) return res.status(400).json({ error: 'Judul pengumuman wajib diisi.' });
+  const info = db.prepare(`
+    INSERT INTO announcements (user_id, title, content, source, is_pinned)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(req.user.id, String(title).trim(), content || '', source || null, is_pinned ? 1 : 0);
+  res.status(201).json({ ok: true, id: info.lastInsertRowid });
+});
+
+router.put('/announcements/:id', (req, res) => {
+  const a = db.prepare('SELECT * FROM announcements WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
+  if (!a) return res.status(404).json({ error: 'Pengumuman tidak ditemukan.' });
+  const updates = [], values = [];
+  for (const key of ['title', 'content', 'source', 'is_pinned']) {
+    if (key in req.body) {
+      if (key === 'title' && !String(req.body.title || '').trim()) {
+        return res.status(400).json({ error: 'Judul pengumuman wajib diisi.' });
+      }
+      updates.push(`${key} = ?`);
+      values.push(key === 'is_pinned' ? (req.body[key] ? 1 : 0) : (req.body[key] || null));
+    }
+  }
+  if (!updates.length) return res.status(400).json({ error: 'Tidak ada perubahan.' });
+  db.prepare(`UPDATE announcements SET ${updates.join(', ')} WHERE id = ?`).run(...values, a.id);
+  res.json({ ok: true });
+});
+
+router.delete('/announcements/:id', (req, res) => {
+  const info = db.prepare('DELETE FROM announcements WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
+  if (!info.changes) return res.status(404).json({ error: 'Pengumuman tidak ditemukan.' });
+  res.json({ ok: true });
+});
+
+/* ============================================================
+ * KRS — RENCANA STUDI PER SEMESTER
+ * ============================================================ */
+
+router.get('/krs', (req, res) => {
+  const sem = req.query.semester_id
+    ? semesterOfUser(req.query.semester_id, req.user.id)
+    : db.prepare('SELECT * FROM semesters WHERE user_id = ? AND is_active = 1').get(req.user.id);
+  if (!sem) return res.json({ krs: null, courses: [], total_sks: 0 });
+
+  const krs = db.prepare('SELECT * FROM krs WHERE user_id = ? AND semester_id = ?').get(req.user.id, sem.id) || null;
+  const courses = db.prepare('SELECT * FROM courses WHERE semester_id = ? AND user_id = ? ORDER BY course_code')
+    .all(sem.id, req.user.id);
+  res.json({
+    semester: sem,
+    krs,
+    courses,
+    total_sks: courses.reduce((sum, c) => sum + (c.sks || 0), 0)
+  });
+});
+
+router.put('/krs', (req, res) => {
+  const { semester_id, status = 'draft', notes } = req.body || {};
+  const sem = semesterOfUser(semester_id, req.user.id);
+  if (!sem) return res.status(404).json({ error: 'Semester tidak ditemukan.' });
+  const st = ['draft', 'diajukan', 'disetujui'].includes(status) ? status : 'draft';
+  db.prepare(`
+    INSERT INTO krs (user_id, semester_id, status, notes, updated_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
+    ON CONFLICT(user_id, semester_id) DO UPDATE SET
+      status = excluded.status,
+      notes = excluded.notes,
+      updated_at = datetime('now')
+  `).run(req.user.id, sem.id, st, notes || null);
   res.json({ ok: true });
 });
 

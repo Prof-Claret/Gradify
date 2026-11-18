@@ -41,6 +41,13 @@ const DATA_TABLES = [
   'courses',
   'tasks',
   'notes',
+  'dosen',
+  'attendance',
+  'materials',
+  'exams',
+  'calendar_events',
+  'announcements',
+  'krs',
   'skripsi_milestones',
   'portfolio_items',
   'app_settings',
@@ -49,7 +56,9 @@ const DATA_TABLES = [
   'faculty_features'
 ];
 const RESET_SEQUENCE_TABLES = [
-  'users', 'semesters', 'courses', 'tasks', 'notes', 'campuses', 'faculties', 'programs',
+  'users', 'semesters', 'courses', 'tasks', 'notes', 'dosen', 'attendance', 'materials',
+  'exams', 'calendar_events', 'announcements', 'krs',
+  'campuses', 'faculties', 'programs',
   'skripsi_milestones', 'portfolio_items', 'campus_logos'
 ];
 

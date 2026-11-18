@@ -14,7 +14,7 @@
 | 1 | **Multi-Kampus Default + Fitur Spesifik per Fakultas/Prodi** | ⬜ Belum mulai | 🔴 Tinggi | Sekarang |
 | 2 | Pemisahan modul tools per prodi (lanjutan dari #1) | ⬜ Belum mulai | 🔴 Tinggi | Setelah #1 |
 | 3 | Panel Admin: Kelola Kampus, Fakultas & Prodi | ⬜ Belum mulai | 🔴 Tinggi | Setelah #1 |
-| 4 | _TBD — next feature_ | ⬜ Belum mulai | 🟡 Sedang | — |
+| 4 | **Presensi, Tugas Upload, E-Learning & SIAK** | ✅ Selesai | 🔴 Tinggi | Selesai |
 | 5 | _TBD — next feature_ | ⬜ Belum mulai | 🟡 Sedang | — |
 
 > 📝 Catatan: daftar #4 dan seterusnya akan diisi setelah fitur #1–#3 selesai.
@@ -442,4 +442,46 @@ module.exports = [
 
 ---
 
-_Dokumen ini akan diperbarui seiring progres. Terakhir diperbarui: 15 November 2026._
+# ✅ Feature #4 — Presensi, Tugas Upload, E-Learning & SIAK
+
+**Status:** ✅ Selesai
+
+## Tujuan
+
+Menambahkan fitur yang lazim ada di situs e-learning dan SIAK kampus, serta memperbaiki pelacak tugas agar mendukung unggah file.
+
+## 4.1 Presensi
+
+- Tabel `attendance` (unik per mata kuliah + tanggal).
+- Status: **hadir, izin, sakit, alfa**; nomor pertemuan dan catatan opsional.
+- Halaman **Presensi** (`/js/views/presensi.js`): rekap per mata kuliah, persentase kehadiran, filter per matkul/semester, edit status inline, dan hapus catatan.
+- API: `GET/POST /api/academics/attendance`, `PUT/DELETE /api/academics/attendance/:id`.
+
+## 4.2 Tugas & Upload
+
+- Kolom baru pada `tasks`: `attachment_url`, `attachment_name`, `submission_url`, `submission_name`, `submitted_at`.
+- Halaman **Tugas & Upload** (`/js/views/tugas.js`): filter jenis/status, statistik, lampiran soal, unggah jawaban, hapus file, dan tandai selesai.
+- API: `POST/DELETE /api/academics/tasks/:id/attachment` dan `POST/DELETE /api/academics/tasks/:id/submission`.
+- File disimpan di `data/uploads/files/` dengan nama acak dan disajikan melalui `/uploads/files/:filename` (validasi nama, `nosniff`, dipaksa unduh).
+
+## 4.3 E-Learning
+
+- Tabel `materials`, `exams`, `announcements`.
+- Halaman **E-Learning** (`/js/views/elearning.js`) dengan tab **Materi Kuliah**, **Jadwal Ujian** (UTS/UAS/Quiz/Remedial), dan **Pengumuman** (bisa disematkan).
+- Materi mendukung unggah file (maks 20 MB) dan/atau tautan.
+
+## 4.4 SIAK
+
+- Tabel `krs` (status per semester) dan `calendar_events`.
+- Halaman **SIAK** (`/js/views/siak.js`) dengan tab **KRS** (status draft/diajukan/disetujui + total SKS), **Kalender Akademik**, dan **Ringkasan Studi** per semester.
+- API: `GET/PUT /api/academics/krs`, `GET/POST/PUT/DELETE /api/academics/calendar`.
+
+## 4.5 Integrasi
+
+- Empat fitur baru ditambahkan ke katalog `features` sebagai `is_general = 1` sehingga tersedia untuk semua prodi, dan muncul di grup sidebar **Kampus**.
+- Backup/restore admin menyertakan seluruh tabel baru.
+- 6 integration test baru di `test/elearning_siak.test.js` (total 29 test lulus).
+
+---
+
+_Dokumen ini akan diperbarui seiring progres. Terakhir diperbarui: 19 November 2026._
