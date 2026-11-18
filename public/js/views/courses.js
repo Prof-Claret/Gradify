@@ -13,6 +13,7 @@ export async function render(main, ctx) {
 
   let semId = sessionStorage.getItem('gradify_course_sem') || 'active';
   let semesterRow = null;
+  let dosenList = [];
 
   async function load() {
     let { semesters } = await api.get('/api/academics/semesters');
@@ -28,10 +29,13 @@ export async function render(main, ctx) {
       ? await api.get(`/api/academics/courses?semester_id=${semesterRow.id}`)
       : { courses: [] };
 
-    draw(semesters, courses);
+    const { dosen: fetchedDosen } = await api.get('/api/academics/dosen').catch(() => ({ dosen: [] }));
+    dosenList = fetchedDosen;
+
+    draw(semesters, courses, dosenList);
   }
 
-  function draw(semesters, courses) {
+  function draw(semesters, courses, dosenList) {
     const totalSks = courses.reduce((a, c) => a + c.sks, 0);
     main.innerHTML = `
     <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
@@ -71,6 +75,17 @@ export async function render(main, ctx) {
       </div>
     </div>
 
+    <!-- Daftar Dosen -->
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-bold text-slate-800">👨‍🏫 Daftar Dosen</h3>
+        <button id="add-dosen" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg sm:px-4 sm:py-2">+ Tambah Dosen</button>
+      </div>
+      <div id="dosen-list" class="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        ${dosenList.length ? dosenList.map(d => dosenCard(d)).join('') : '<p class="text-slate-400 text-xs">Belum ada dosen. Tambahkan dosen terlebih dahulu agar bisa dipilih saat input matkul.</p>'}
+      </div>
+    </div>
+
     <!-- Course cards -->
     <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
       ${courses.map(c => courseCard(c)).join('')}
@@ -82,29 +97,67 @@ export async function render(main, ctx) {
     </div>`;
 
     bindTimetable(courses);
-    wire(semesters, courses);
+    wire(semesters, courses, dosenList);
+  }
+
+  function dosenCard(d) {
+    return `<div class="border border-slate-200 rounded-xl p-3 bg-white">
+      <p class="font-semibold text-sm text-slate-800 truncate">${esc(d.nama)}${d.nip_nidn ? ` <span class="text-[10px] text-slate-400 font-normal">(${esc(d.nip_nidn)})</span>` : ''}</p>
+      <p class="text-[10px] text-slate-500 mt-0.5">${esc(d.email || d.telepon || '—')}</p>
+      <div class="flex gap-1 mt-2">
+        <button class="d-edit text-[10px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-700 font-semibold" data-id="${d.id}" title="Ubah nama">✏️</button>
+        <button class="d-del text-[10px] px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-700 font-semibold" data-id="${d.id}" title="Hapus dosen">🗑</button>
+      </div>
+    </div>`;
   }
 
   /* ---------- timetable helper ---------- */
-  function timeRows(courses) {
-    // Build hour slots 07:00-21:00
-    const rows = [];
-    for (let h = 7; h <= 20; h++) {
-      const slot = `${String(h).padStart(2, '0')}:00`;
-      rows.push({ slot, cells: DAYS.map(day => courses.filter(c => c.day === day && c.start_time && parseInt(c.start_time) === h)) });
-    }
-    return rows;
+  const GRID_START = 7 * 60;   // 07:00 dalam menit
+  const GRID_END = 21 * 60;    // 21:00
+  const SLOT = 30;             // 30 menit per slot
+
+  function toMinutes(t) {
+    if (!t) return null;
+    const [h, m] = String(t).split(':').map(Number);
+    if (h == null || m == null) return null;
+    return h * 60 + m;
   }
+
+  function buildGrid(courses) {
+    const slotCount = (GRID_END - GRID_START) / SLOT; // 28 slot
+    const grid = DAYS.map(() => Array(slotCount).fill(null));
+    for (const c of courses) {
+      const s = toMinutes(c.start_time);
+      const e = toMinutes(c.end_time);
+      if (s == null || e == null || e <= s) continue;
+      const di = DAYS.indexOf(c.day);
+      if (di < 0) continue;
+      const startSlot = Math.max(0, Math.floor((s - GRID_START) / SLOT));
+      const endSlot = Math.min(slotCount, Math.ceil((e - GRID_START) / SLOT));
+      for (let sl = startSlot; sl < endSlot; sl++) grid[di][sl] = c;
+    }
+    return { grid, slotCount };
+  }
+
   function bindTimetable(courses) {
     const tbody = main.querySelector('tbody');
     if (!tbody) return;
-    const rows = timeRows(courses);
-    tbody.innerHTML = rows.map(r => `<tr>
-      <td class="border border-slate-200 font-mono text-[10px] text-slate-500 p-1.5 text-center">${r.slot}</td>
-      ${r.cells.map(cell => {
-        const c = cell[0];
+    const { grid, slotCount } = buildGrid(courses);
+    const html = [];
+    for (let sl = 0; sl < slotCount; sl++) {
+      const minutes = GRID_START + sl * SLOT;
+      const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+      const mm = String(minutes % 60).padStart(2, '0');
+      const cells = DAYS.map((day, di) => {
+        const c = grid[di][sl];
         if (!c) return '<td class="border border-slate-100 p-1"></td>';
-        const span = c.end_time ? Math.max(1, (parseFloat(c.end_time) - parseFloat(c.start_time)) || 1) : 1;
+        // Render blok hanya di slot awal mata kuliah; rowspan menutupi sisa slot
+        const s = toMinutes(c.start_time);
+        const startSlot = Math.max(0, Math.floor((s - GRID_START) / SLOT));
+        if (sl !== startSlot) return '<td class="border border-slate-100 p-1"></td>';
+        const e = toMinutes(c.end_time);
+        const endSlot = Math.min(slotCount, Math.ceil((e - GRID_START) / SLOT));
+        const span = endSlot - startSlot;
         return `<td class="border border-slate-200 p-1 align-top" rowspan="${span}">
           <div class="bg-indigo-500 text-white rounded-md p-1.5 h-full">
             <p class="font-bold text-[10px] leading-tight truncate">${esc(c.course_name)}</p>
@@ -112,8 +165,13 @@ export async function render(main, ctx) {
             <p class="text-[9px] opacity-90 truncate">${esc(c.room || '')}</p>
           </div>
         </td>`;
-      }).join('')}
-    </tr>`).join('');
+      });
+      html.push(`<tr>
+        <td class="border border-slate-200 font-mono text-[10px] text-slate-500 p-1.5 text-center">${hh}:${mm}</td>
+        ${cells.join('')}
+      </tr>`);
+    }
+    tbody.innerHTML = html.join('');
   }
 
   /* ---------- course card ---------- */
@@ -190,7 +248,11 @@ export async function render(main, ctx) {
           </div>
           <div>
             <label class="g-lbl">Dosen</label>
-            <input name="lecturer" value="${course ? esc(course.lecturer || '') : ''}" class="g-inp" placeholder="Nama dosen" />
+            <select name="dosen_id" class="g-inp" id="cm-dosen-select">
+              <option value="">— Pilih dosen —</option>
+              ${dosenList.map(d => `<option value="${d.id}">${esc(d.nama)}</option>`).join('')}
+            </select>
+            <input name="lecturer" class="g-inp mt-2" placeholder="Ketik nama dosen (jika pilih sendiri)" value="${course ? esc(course.lecturer || '') : ''}" />
           </div>
           <div class="md:col-span-2">
             <label class="g-lbl">Kontak Dosen (email/WA)</label>
@@ -251,6 +313,21 @@ export async function render(main, ctx) {
     weightNames.forEach(n => form.elements[n]?.addEventListener('input', refreshWeightSum));
     refreshWeightSum();
 
+    const dosenSel = body.querySelector('#cm-dosen-select');
+    const lecturerInp = form.elements['lecturer'];
+    const contactInp = form.elements['lecturer_contact'];
+    if (course) {
+      const match = dosenList.find(d => d.nama === course.lecturer);
+      if (match) dosenSel.value = String(match.id);
+    }
+    dosenSel.addEventListener('change', () => {
+      const d = dosenList.find(x => String(x.id) === String(dosenSel.value));
+      if (d) {
+        lecturerInp.value = d.nama;
+        if (d.email || d.telepon) contactInp.value = d.email || d.telepon;
+      }
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
@@ -273,7 +350,7 @@ export async function render(main, ctx) {
     });
   }
 
-  function wire(semesters, courses) {
+  function wire(semesters, courses, dosenList) {
     document.getElementById('sem-pick').addEventListener('change', (e) => {
       sessionStorage.setItem('gradify_course_sem', e.target.value);
       load();
@@ -296,6 +373,65 @@ export async function render(main, ctx) {
       await api.del(`/api/academics/courses/${c.id}`);
       toast('Matkul dihapus', 'info');
       ctx.refresh();
+    }));
+
+    /* ---------- Dosen CRUD ---------- */
+    const addBtn = document.getElementById('add-dosen');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        addBtn.classList.add('hidden');
+        const row = document.createElement('div');
+        row.id = 'dosen-add-row';
+        row.className = 'grid sm:grid-cols-4 gap-2 mb-3';
+        row.innerHTML = `
+          <input id="d-new-nama" placeholder="Nama dosen" class="g-inp" />
+          <input id="d-new-nip" placeholder="NIP/NIDN" class="g-inp" />
+          <input id="d-new-email" placeholder="Email" class="g-inp" />
+          <input id="d-new-telp" placeholder="Telepon" class="g-inp" />
+          <button id="d-save" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-3 py-2 rounded-lg sm:col-span-2">Simpan</button>
+          <button id="d-cancel" class="text-xs text-slate-500 px-3 py-2 rounded-lg hover:bg-slate-100 sm:col-span-2">Batal</button>
+        `;
+        addBtn.parentElement.after(row);
+        row.querySelector('#d-cancel').addEventListener('click', () => {
+          row.remove();
+          addBtn.classList.remove('hidden');
+        });
+        row.querySelector('#d-save').addEventListener('click', async () => {
+          const nama = row.querySelector('#d-new-nama').value.trim();
+          if (!nama) return toast('Nama dosen wajib diisi.', 'warn');
+          try {
+            await api.post('/api/academics/dosen', {
+              nip_nidn: row.querySelector('#d-new-nip').value.trim() || null,
+              nama,
+              email: row.querySelector('#d-new-email').value.trim() || null,
+              telepon: row.querySelector('#d-new-telp').value.trim() || null
+            });
+            toast('Dosen ditambahkan');
+            load();
+          } catch (err) { toast(err.message, 'error'); }
+        });
+      });
+    }
+
+    main.querySelectorAll('.d-edit').forEach(b => b.addEventListener('click', async () => {
+      const d = dosenList.find(x => String(x.id) === String(b.dataset.id));
+      if (!d) return;
+      const nama = prompt('Ubah nama dosen:', d.nama);
+      if (nama === null || !nama.trim()) return;
+      try {
+        await api.put(`/api/academics/dosen/${d.id}`, { nama: nama.trim() });
+        toast('Dosen diperbarui');
+        load();
+      } catch (err) { toast(err.message, 'error'); }
+    }));
+    main.querySelectorAll('.d-del').forEach(b => b.addEventListener('click', async () => {
+      const d = dosenList.find(x => String(x.id) === String(b.dataset.id));
+      if (!d || !confirm(`Hapus dosen "${d.nama}"?`)) return;
+      try {
+        await api.del(`/api/academics/dosen/${d.id}`);
+        toast('Dosen dihapus', 'info');
+        load();
+      } catch (err) { toast(err.message, 'error'); }
     }));
   }
 

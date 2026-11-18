@@ -203,6 +203,92 @@ CREATE TABLE IF NOT EXISTS faculty_features (
   feature_key TEXT NOT NULL REFERENCES features(key) ON DELETE CASCADE,
   PRIMARY KEY (faculty_id, feature_key)
 );
+
+/* ---------- Master dosen (per user) ---------- */
+CREATE TABLE IF NOT EXISTS dosen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  nip_nidn TEXT,
+  nama TEXT NOT NULL,
+  email TEXT,
+  telepon TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+/* ---------- Presensi / kehadiran per mata kuliah ---------- */
+CREATE TABLE IF NOT EXISTS attendance (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  meeting_no INTEGER,
+  date TEXT NOT NULL,                    -- YYYY-MM-DD
+  status TEXT DEFAULT 'hadir',           -- hadir | izin | sakit | alfa
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, course_id, date)
+);
+
+/* ---------- Materi kuliah (e-learning) ---------- */
+CREATE TABLE IF NOT EXISTS materials (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  file_url TEXT,
+  file_name TEXT,
+  link_url TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+/* ---------- Jadwal ujian (UTS/UAS/Quiz) ---------- */
+CREATE TABLE IF NOT EXISTS exams (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
+  type TEXT DEFAULT 'UTS',               -- UTS | UAS | Quiz | Remedial
+  exam_date TEXT NOT NULL,
+  start_time TEXT,
+  end_time TEXT,
+  room TEXT,
+  notes TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+/* ---------- Kalender akademik ---------- */
+CREATE TABLE IF NOT EXISTS calendar_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  start_date TEXT NOT NULL,
+  end_date TEXT,
+  type TEXT DEFAULT 'akademik',          -- akademik | libur | ujian | registrasi | lainnya
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+/* ---------- Pengumuman kampus ---------- */
+CREATE TABLE IF NOT EXISTS announcements (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  content TEXT DEFAULT '',
+  source TEXT,
+  is_pinned INTEGER DEFAULT 0,
+  published_at TEXT DEFAULT (datetime('now')),
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+/* ---------- KRS (status rencana studi per semester) ---------- */
+CREATE TABLE IF NOT EXISTS krs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  semester_id INTEGER NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'draft',           -- draft | diajukan | disetujui
+  notes TEXT,
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(user_id, semester_id)
+);
 `);
 
 /* Migrate existing DBs that predate grading weight columns */
@@ -221,6 +307,12 @@ ensureColumn('users', 'is_admin', 'INTEGER DEFAULT 0');
 ensureColumn('users', 'campus_id', 'INTEGER');
 ensureColumn('users', 'faculty_id', 'INTEGER');
 ensureColumn('users', 'program_id', 'INTEGER');
+/* Lampiran & jawaban tugas (upload) */
+ensureColumn('tasks', 'attachment_url', 'TEXT');
+ensureColumn('tasks', 'attachment_name', 'TEXT');
+ensureColumn('tasks', 'submission_url', 'TEXT');
+ensureColumn('tasks', 'submission_name', 'TEXT');
+ensureColumn('tasks', 'submitted_at', 'TEXT');
 
 /* ============================================================
  * APP SETTINGS (admin dashboard)

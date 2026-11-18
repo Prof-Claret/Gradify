@@ -132,6 +132,10 @@ export const routes = {
   notes:        { module: '/js/views/notes.js',      group: 'Akademik', icon: '📝', label: 'Catatan', featureKey: 'notes' },
   gpa:          { module: '/js/views/gpa.js',        group: 'Akademik', icon: '🎯', label: 'IPK & Transkrip', featureKey: 'gpa' },
   'student-card': { module: '/js/views/student-card.js', group: 'Akademik', icon: '🪪', label: 'Kartu Mahasiswa', featureKey: 'student-card' },
+  presensi:     { module: '/js/views/presensi.js',   group: 'Kampus', icon: '✅', label: 'Presensi', featureKey: 'presensi' },
+  tugas:        { module: '/js/views/tugas.js',      group: 'Kampus', icon: '📤', label: 'Tugas & Upload', featureKey: 'tugas' },
+  elearning:    { module: '/js/views/elearning.js',  group: 'Kampus', icon: '🎓', label: 'E-Learning', featureKey: 'elearning' },
+  siak:         { module: '/js/views/siak.js',       group: 'Kampus', icon: '🏛️', label: 'SIAK', featureKey: 'siak' },
   calculator:   { module: '/js/views/calculator.js', group: 'Umum', icon: '🧮', label: 'Kalkulator Ilmiah', featureKey: 'calculator' },
   toolkit:      { module: '/js/views/toolkit.js',    group: 'Toolkit CS', icon: '🛠️', label: 'CS Math Toolkit', featureKey: 'cs-toolkit' },
   discrete:     { module: '/js/views/discrete.js',   group: 'Toolkit CS', icon: '🔗', label: 'Matematika Diskrit', featureKey: 'discrete-math' },
@@ -265,7 +269,7 @@ function renderNavItem(key) {
     <span class="text-base w-5 text-center pointer-events-none">${r.icon}</span><span class="pointer-events-none">${esc(r.label)}</span></a>`;
 }
 
-const GROUP_ORDER = ['Akademik', 'Toolkit CS', 'Toolkit Keuangan', 'Toolkit Teknik', 'Toolkit Hukum', 'Umum', 'Kehidupan'];
+const GROUP_ORDER = ['Akademik', 'Kampus', 'Toolkit CS', 'Toolkit Keuangan', 'Toolkit Teknik', 'Toolkit Hukum', 'Umum', 'Kehidupan'];
 
 function renderSidebar() {
   const groups = {};

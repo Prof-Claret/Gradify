@@ -16,10 +16,18 @@ Gradify adalah aplikasi akademik all-in-one untuk mahasiswa yang menggabungkan p
 - Dukungan kampus, fakultas, dan prodi custom; data akademik mahasiswa hanya dapat diubah admin.
 - Pengelolaan semester aktif, tahun akademik, dan arsip semester.
 - CRUD mata kuliah beserta kode, SKS, jadwal, ruangan, dosen, dan nilai.
+- Master data dosen per mahasiswa (tambah, edit, hapus) yang dapat dipilih langsung saat mengisi mata kuliah.
 - Pelacak tugas dengan jenis, prioritas, tenggat waktu, dan status.
 - Transkrip akademik, perhitungan IPS, IPK, serta simulasi target IPK.
 - Kartu mahasiswa (KTM) digital ukuran CR80 dengan barcode Code 39, kode verifikasi, mode cetak dua sisi, dan ekspor PNG 300 DPI.
 - Kalkulator batas maksimal SKS berdasarkan IPS.
+
+### Kampus — E-Learning & SIAK
+
+- **Presensi** — catat kehadiran per mata kuliah (hadir, izin, sakit, alfa) lengkap dengan nomor pertemuan, catatan, rekap persentase, dan peringatan ketika kehadiran di bawah 75%.
+- **Tugas & Upload** — kelola tugas/ujian/quiz/project, unggah lampiran soal, unggah file jawaban, tandai selesai, serta pantau deadline.
+- **E-Learning** — unggah materi kuliah berupa file (PDF/dokumen/spreadsheet/presentasi/gambar/ZIP, maks 20 MB) atau tautan, jadwal ujian UTS/UAS/Quiz/Remedial, dan pengumuman kampus.
+- **SIAK** — status KRS per semester (draft/diajukan/disetujui), kalender akademik, dan ringkasan studi per semester.
 
 ### Catatan dan Kehidupan Mahasiswa
 
@@ -130,7 +138,8 @@ Catatan keamanan backup:
 | Kesehatan | `GET /api/health` | Status aplikasi dan versi |
 | Konfigurasi | `GET /api/config` | Branding, registrasi, pengumuman, dan mode pemeliharaan publik |
 | Autentikasi | `/api/auth/*` | Registrasi, login, profil, logout, preset kampus, dan fitur per prodi (`/api/auth/features`) |
-| Akademik | `/api/academics/*` | Semester, mata kuliah, tugas, transkrip, dan data kartu mahasiswa |
+| Akademik | `/api/academics/*` | Semester, mata kuliah, dosen, presensi, tugas, materi, ujian, kalender, pengumuman, KRS, transkrip, dan data kartu mahasiswa |
+| Unggah file | `POST /api/academics/tasks/:id/attachment`, `POST /api/academics/tasks/:id/submission`, `POST /api/academics/materials` | Lampiran soal, jawaban tugas, dan materi kuliah (maks 20 MB); diunduh via `/uploads/files/:filename` |
 | Catatan | `/api/notes/*` | Daftar, pembuatan, pembaruan, dan penghapusan catatan |
 | Kehidupan | `/api/life/*` | Anggaran, skripsi, dan portfolio |
 | Admin | `/api/admin/*` | Setup/login admin, statistik, pengguna, kampus/fakultas/prodi, pemetaan fitur, pengaturan, dan backup/restore |
