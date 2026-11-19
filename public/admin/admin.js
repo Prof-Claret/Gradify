@@ -2,6 +2,8 @@
  * Gradify Admin Dashboard
  * Vanilla ES module — no build step.
  */
+import { startIconEngine } from '/js/icons.js';
+
 const TOKEN_KEY = 'gradify_admin_token';
 const root = document.getElementById('admin-root');
 
@@ -1692,3 +1694,4 @@ async function loadSettings() {
  * START
  * ============================================================ */
 init();
+startIconEngine();

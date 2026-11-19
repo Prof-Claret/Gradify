@@ -2,10 +2,11 @@
  * Course Management Module (Phase 1.2) — CRUD Matkul + Jadwal + Input Nilai
  */
 import { esc, toast } from '../app.js';
+import { injectFormStyles } from './ui.js';
 
 export const subtitle = () => 'Kelola catalog mata kuliah per semester';
 
-export const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Ahad'];
+export const DAYS = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 export const GRADES = ['', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'E'];
 
 export async function render(main, ctx) {
@@ -62,17 +63,12 @@ export async function render(main, ctx) {
       <p class="text-sm text-slate-400 text-center py-6">Jadwal akan muncul di sini setelah kamu menambah matkul.</p>
     </div>` : `
     <!-- Timetable -->
-    <div class="bg-white border border-slate-200 rounded-2xl p-5 mb-6">
-      <h3 class="font-bold text-slate-800 mb-3">🕐 Jadwal Mingguan</h3>
-      <div class="overflow-x-auto">
-        <table class="w-full text-xs border-collapse min-w-[720px]">
-          <thead><tr>
-            <th class="border border-slate-200 bg-slate-50 p-2 w-16">Jam</th>
-            ${DAYS.map(d => `<th class="border border-slate-200 bg-slate-50 p-2">${d}</th>`).join('')}
-          </tr></thead>
-          <tbody></tbody>
-        </table>
+    <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-bold text-slate-800">🕐 Jadwal Mingguan</h3>
+        <span class="text-[10px] text-slate-400">07:00–21:00</span>
       </div>
+      <div id="timetable" class="overflow-x-auto"></div>
     </div>
 
     <!-- Daftar Dosen -->
@@ -114,64 +110,71 @@ export async function render(main, ctx) {
   /* ---------- timetable helper ---------- */
   const GRID_START = 7 * 60;   // 07:00 dalam menit
   const GRID_END = 21 * 60;    // 21:00
-  const SLOT = 30;             // 30 menit per slot
+  const PX_PER_MIN = 1;        // 60 px per jam
 
   function toMinutes(t) {
     if (!t) return null;
     const [h, m] = String(t).split(':').map(Number);
-    if (h == null || m == null) return null;
+    if (h == null || m == null || Number.isNaN(h) || Number.isNaN(m)) return null;
     return h * 60 + m;
   }
 
-  function buildGrid(courses) {
-    const slotCount = (GRID_END - GRID_START) / SLOT; // 28 slot
-    const grid = DAYS.map(() => Array(slotCount).fill(null));
-    for (const c of courses) {
-      const s = toMinutes(c.start_time);
-      const e = toMinutes(c.end_time);
-      if (s == null || e == null || e <= s) continue;
-      const di = DAYS.indexOf(c.day);
-      if (di < 0) continue;
-      const startSlot = Math.max(0, Math.floor((s - GRID_START) / SLOT));
-      const endSlot = Math.min(slotCount, Math.ceil((e - GRID_START) / SLOT));
-      for (let sl = startSlot; sl < endSlot; sl++) grid[di][sl] = c;
-    }
-    return { grid, slotCount };
-  }
-
   function bindTimetable(courses) {
-    const tbody = main.querySelector('tbody');
-    if (!tbody) return;
-    const { grid, slotCount } = buildGrid(courses);
-    const html = [];
-    for (let sl = 0; sl < slotCount; sl++) {
-      const minutes = GRID_START + sl * SLOT;
-      const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
-      const mm = String(minutes % 60).padStart(2, '0');
-      const cells = DAYS.map((day, di) => {
-        const c = grid[di][sl];
-        if (!c) return '<td class="border border-slate-100 p-1"></td>';
-        // Render blok hanya di slot awal mata kuliah; rowspan menutupi sisa slot
+    const host = main.querySelector('#timetable');
+    if (!host) return;
+
+    const totalMinutes = GRID_END - GRID_START;
+    const totalHeight = totalMinutes * PX_PER_MIN;
+    const hours = [];
+    for (let m = GRID_START; m <= GRID_END; m += 60) hours.push(m);
+
+    const hourLines = () => hours
+      .filter(m => m < GRID_END)
+      .map(m => `<div class="absolute left-0 right-0 border-t ${m % 120 === 0 ? 'border-slate-200' : 'border-slate-100'}" style="top:${(m - GRID_START) * PX_PER_MIN}px"></div>`)
+      .join('');
+
+    const blocksFor = (day) => courses
+      .filter(c => c.day === day && c.start_time)
+      .map(c => {
         const s = toMinutes(c.start_time);
-        const startSlot = Math.max(0, Math.floor((s - GRID_START) / SLOT));
-        if (sl !== startSlot) return '<td class="border border-slate-100 p-1"></td>';
         const e = toMinutes(c.end_time);
-        const endSlot = Math.min(slotCount, Math.ceil((e - GRID_START) / SLOT));
-        const span = endSlot - startSlot;
-        return `<td class="border border-slate-200 p-1 align-top" rowspan="${span}">
-          <div class="bg-indigo-500 text-white rounded-md p-1.5 h-full">
-            <p class="font-bold text-[10px] leading-tight truncate">${esc(c.course_name)}</p>
-            <p class="text-[9px] opacity-90 font-mono">${esc(c.start_time)}-${esc(c.end_time || '')}</p>
-            <p class="text-[9px] opacity-90 truncate">${esc(c.room || '')}</p>
+        if (s == null) return '';
+        const end = e != null && e > s ? e : s + 60;
+        const top = Math.max(0, (s - GRID_START) * PX_PER_MIN);
+        const bottom = Math.min(totalMinutes, (end - GRID_START) * PX_PER_MIN);
+        const height = Math.max(bottom - top - 2, 20);
+        const label = `${c.course_name} · ${c.start_time || ''}${c.end_time ? '–' + c.end_time : ''}${c.room ? ' · ' + c.room : ''}`;
+        return `<div class="absolute left-1 right-1 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white px-1.5 py-1 overflow-hidden shadow-sm ring-1 ring-indigo-700/20 transition-colors"
+          style="top:${top}px;height:${height}px" title="${esc(label)}">
+          <p class="font-bold text-[10px] leading-[1.15] break-words">${esc(c.course_name)}</p>
+          <p class="text-[9px] opacity-90 font-mono mt-0.5">${esc(c.start_time || '')}${c.end_time ? '–' + esc(c.end_time) : ''}</p>
+          <p class="text-[9px] opacity-90 truncate">${esc(c.room || '')}</p>
+        </div>`;
+      })
+      .join('');
+
+    const todayIdx = (new Date().getDay() + 6) % 7;
+
+    host.innerHTML = `
+      <div class="min-w-[760px]">
+        <div class="grid border-b border-slate-200" style="grid-template-columns:56px repeat(${DAYS.length},minmax(0,1fr))">
+          <div class="bg-slate-50 px-1 py-2 text-[10px] font-bold text-slate-400 text-center">Jam</div>
+          ${DAYS.map((d, i) => `<div class="border-l border-slate-200 px-1 py-2 text-[11px] font-bold text-center ${i === todayIdx ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-50 text-slate-600'}">${d}</div>`).join('')}
+        </div>
+        <div class="grid" style="grid-template-columns:56px repeat(${DAYS.length},minmax(0,1fr))">
+          <div class="relative border-r border-slate-200" style="height:${totalHeight}px">
+            ${hours.map(m => {
+              const hh = String(Math.floor(m / 60)).padStart(2, '0');
+              return `<div class="absolute right-1 text-[9px] font-mono text-slate-400" style="top:${(m - GRID_START) * PX_PER_MIN}px">${hh}:00</div>`;
+            }).join('')}
           </div>
-        </td>`;
-      });
-      html.push(`<tr>
-        <td class="border border-slate-200 font-mono text-[10px] text-slate-500 p-1.5 text-center">${hh}:${mm}</td>
-        ${cells.join('')}
-      </tr>`);
-    }
-    tbody.innerHTML = html.join('');
+          ${DAYS.map(day => `
+            <div class="relative border-l border-slate-200" style="height:${totalHeight}px">
+              ${hourLines()}
+              ${blocksFor(day)}
+            </div>`).join('')}
+        </div>
+      </div>`;
   }
 
   /* ---------- course card ---------- */
@@ -295,11 +298,12 @@ export async function render(main, ctx) {
         </form>
       </div>`;
 
-    injectFormStyles();
+    // ui.js sudah membuat style tag saat boot; tidak perlu membuat ulang
     const close = () => modal.classList.add('hidden');
     body.querySelector('#cm-close').addEventListener('click', close);
     body.querySelector('#cm-cancel').addEventListener('click', close);
     modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    injectFormStyles(); // pakai style global dari ui.js
 
     const form = body.querySelector('#cm-form');
     const sumEl = body.querySelector('#cm-weight-sum');
@@ -435,16 +439,5 @@ export async function render(main, ctx) {
     }));
   }
 
-  injectFormStyles();
   await load();
-}
-
-function injectFormStyles() {
-  if (document.getElementById('g-form-style')) return;
-  const s = document.createElement('style');
-  s.id = 'g-form-style';
-  s.textContent = `.g-lbl{font-size:11px;font-weight:600;color:#475569;display:block;margin-bottom:4px}
-  .g-inp{width:100%;border:1px solid #cbd5e1;border-radius:0.6rem;padding:0.55rem 0.8rem;font-size:0.85rem;outline:none}
-  .g-inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px #e0e7ff}`;
-  document.head.appendChild(s);
 }

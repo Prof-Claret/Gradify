@@ -2,6 +2,7 @@
  * Gradify SPA Router & App Shell
  */
 import { api, getToken, setToken } from './api.js';
+import { startIconEngine } from './icons.js';
 
 /* ---------- shared global helpers ---------- */
 export const esc = (s) => {
@@ -494,4 +495,5 @@ window.addEventListener('hashchange', () => {
   const ok = await tryResumeSession();
   if (ok) showApp();
   else showAuth();
+  startIconEngine();
 })();
