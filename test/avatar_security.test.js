@@ -6,8 +6,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 const http = require('node:http');
 const sharp = require('sharp');
+
+const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'gradify-avatar-security-'));
+process.env.GRADIFY_AVATAR_DIR = path.join(TMP_DIR, 'uploads', 'avatars');
 
 const {
   detectImageMagicBytes,
@@ -21,6 +25,10 @@ const {
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
+
+test.after(() => {
+  fs.rmSync(TMP_DIR, { recursive: true, force: true });
+});
 
 test('Security Layer 1: detectImageMagicBytes properly detects signatures', async () => {
   // 1. Valid JPEG buffer

@@ -27,6 +27,7 @@ const {
   createFaculty, updateFaculty, deleteFaculty, createProgram, updateProgram, deleteProgram,
   setUserAcademic, seedPresets, migrateUserAcademicLinks
 } = require('../utils/campusCatalog');
+const { buildXiiArchive, readXiiArchive, restoreUploads } = require('../utils/xiiArchive');
 
 const router = express.Router();
 const packageJson = require('../../package.json');
@@ -65,6 +66,17 @@ const RESET_SEQUENCE_TABLES = [
 const backupUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024, files: 1 }
+});
+
+/* Arsip .xii mencakup database + seluruh upload (foto, logo, lampiran),
+ * sehingga batasnya lebih besar daripada backup JSON/SQLite. */
+const xiiUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 250 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (/\.xii$/i.test(file.originalname || '')) cb(null, true);
+    else cb(new Error('Format file harus .xii.'));
+  }
 });
 
 const logoUpload = multer({
@@ -257,7 +269,9 @@ function importTables(tables) {
     db.exec('COMMIT');
 
     // Backup lama mungkin belum punya katalog kampus → seed ulang & migrasi user
-    if (db.prepare('SELECT COUNT(*) AS c FROM campuses').get().c === 0) seedPresets();
+    const featureCount = db.prepare('SELECT COUNT(*) AS c FROM features').get().c;
+    const campusCount = db.prepare('SELECT COUNT(*) AS c FROM campuses').get().c;
+    if (featureCount === 0 || campusCount === 0) seedPresets();
     migrateUserAcademicLinks();
 
     return tableCounts();
@@ -896,6 +910,81 @@ router.post('/database/import', (req, res) => {
     } catch (importError) {
       console.error('[Admin Import]', importError.message);
       res.status(400).json({ error: importError.message || 'Import database gagal.' });
+    }
+  });
+});
+
+/* ============================================================
+ * EXPORT / IMPORT DATA (.xii) — database + seluruh upload
+ * ============================================================ */
+function uploadsDir() {
+  return path.join(path.dirname(DB_PATH), 'uploads');
+}
+
+router.get('/database/export-xii', (req, res, next) => {
+  try {
+    const { buffer, manifest } = buildXiiArchive({
+      db,
+      tables: DATA_TABLES,
+      uploadsDir: uploadsDir(),
+      appVersion: packageJson.version
+    });
+    const filename = `gradify-data-${timestamp()}.xii`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('X-Gradify-Archive', 'xii');
+    res.setHeader('X-Gradify-Tables', String(Object.keys(manifest.tables).length));
+    res.setHeader('X-Gradify-Uploads', String(manifest.uploads.count));
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/database/import-xii', (req, res) => {
+  xiiUpload.single('backup')(req, res, (err) => {
+    if (err) {
+      const message = err.code === 'LIMIT_FILE_SIZE'
+        ? 'Ukuran file .xii melebihi 250 MB.'
+        : err.message;
+      return res.status(400).json({ error: message });
+    }
+
+    try {
+      if (!req.file?.buffer) {
+        return res.status(400).json({ error: 'Pilih file .xii terlebih dahulu.' });
+      }
+
+      const archive = readXiiArchive(req.file.buffer, {
+        maxEntries: 20000,
+        maxTotalBytes: 2 * 1024 * 1024 * 1024
+      });
+
+      validateImportTables(archive.tables);
+
+      const safetyBackup = createSafetyBackup();
+
+      // Tulis file lebih dulu: jika import database gagal, file tambahan
+      // hanya menjadi orphan dan tidak merusak data lama.
+      const fileResult = restoreUploads(archive.files, uploadsDir());
+      const counts = importTables(archive.tables);
+
+      res.json({
+        ok: true,
+        reauth: true,
+        message: 'Data .xii berhasil dipulihkan. Semua sesi dihentikan; silakan login kembali.',
+        safety_backup: safetyBackup,
+        counts,
+        uploads: fileResult,
+        archive: {
+          version: archive.manifest.version,
+          exported_at: archive.manifest.exported_at,
+          app_version: archive.manifest.app_version
+        }
+      });
+    } catch (importError) {
+      console.error('[Admin Import XII]', importError.message);
+      res.status(400).json({ error: importError.message || 'Import data .xii gagal.' });
     }
   });
 });

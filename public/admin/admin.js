@@ -307,6 +307,7 @@ const TABS = {
   dashboard: { icon: '📊', label: 'Dashboard', subtitle: 'Ringkasan kondisi website & database' },
   users: { icon: '👥', label: 'Pengguna', subtitle: 'Kelola akun mahasiswa dan administrator' },
   academic: { icon: '🏫', label: 'Kampus & Prodi', subtitle: 'Kelola kampus, fakultas, prodi & fitur per prodi' },
+  data: { icon: '📦', label: 'Export / Import Data', subtitle: 'Arsip .xii: database, akun, foto, dan seluruh upload' },
   backup: { icon: '💾', label: 'Backup & Restore', subtitle: 'Ekspor, impor, dan amankan database' },
   settings: { icon: '⚙️', label: 'Pengaturan', subtitle: 'Identitas situs, akses, dan pemeliharaan' }
 };
@@ -332,6 +333,7 @@ function renderShell() {
         ${navItem('users')}
         ${navItem('academic')}
         <p class="a-nav-label mt-4">Sistem</p>
+        ${navItem('data')}
         ${navItem('backup')}
         ${navItem('settings')}
       </nav>
@@ -413,6 +415,7 @@ async function navigateTab(tab) {
     if (tab === 'dashboard') await loadDashboard();
     else if (tab === 'users') await loadUsers(state.usersPage, state.usersSearch);
     else if (tab === 'academic') await loadAcademic();
+    else if (tab === 'data') await loadDataArchive();
     else if (tab === 'backup') await loadBackup();
     else await loadSettings();
   } catch (err) {
@@ -1166,6 +1169,126 @@ async function openFeatureModal(type, id, name) {
 }
 
 /* ============================================================
+ * EXPORT / IMPORT DATA (.xii)
+ * ============================================================ */
+async function loadDataArchive() {
+  const main = document.getElementById('admin-main');
+
+  main.innerHTML = `
+    <div class="mb-5">
+      <h2 class="text-xl font-extrabold text-slate-800">Export / Import Data (.xii)</h2>
+      <p class="text-xs text-slate-500">Satu file arsip berisi database, akun, foto profil, logo, lampiran tugas, dan materi kuliah.</p>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-5 mb-5">
+      <section class="a-card p-5">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="font-extrabold text-slate-800">📦 Export Data ke .xii</h3>
+            <p class="text-xs text-slate-500 mt-1">Unduh seluruh data Gradify dalam satu file portabel, termasuk semua foto dan upload.</p>
+          </div>
+          <span class="text-2xl">📦</span>
+        </div>
+        <div class="mt-4 bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-[11px] text-indigo-900">
+          File <b>.xii</b> dapat dipindahkan ke server lain, lalu diimpor kembali melalui halaman ini.
+        </div>
+        <button id="export-xii" class="a-btn a-btn-primary w-full mt-4 py-2.5">⬇️ Export Data (.xii)</button>
+        <p class="text-[11px] text-rose-600 mt-2">🔒 File berisi akun dan hash password. Simpan di tempat aman dan jangan dibagikan.</p>
+      </section>
+
+      <section class="a-card p-5 border-amber-200">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="font-extrabold text-slate-800">📥 Import Data dari .xii</h3>
+            <p class="text-xs text-slate-500 mt-1">Pulihkan database dan seluruh upload dari file <b>.xii</b> (maks. 250 MB).</p>
+          </div>
+          <span class="text-2xl">♻️</span>
+        </div>
+        <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-900">
+          ⚠️ Import akan <b>mengganti seluruh data</b> saat ini. Backup database otomatis dibuat sebelum import. Semua sesi login akan dihentikan.
+        </div>
+        <label class="block mt-3">
+          <span class="a-label">File .xii</span>
+          <input id="import-xii-file" type="file" accept=".xii" class="a-input file:mr-3 file:border-0 file:bg-indigo-50 file:text-indigo-700 file:px-3 file:py-1.5 file:rounded-lg file:text-xs file:font-bold" />
+        </label>
+        <button id="import-xii-btn" class="a-btn a-btn-danger w-full mt-3 py-2.5" disabled>♻️ Import & Ganti Seluruh Data</button>
+      </section>
+    </div>
+
+    <section class="a-card p-5">
+      <h3 class="font-extrabold text-slate-800 mb-2">🧾 Isi File .xii</h3>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <p class="font-bold text-slate-700">🗄️ database.json</p>
+          <p class="text-slate-500 mt-1">Semua tabel: akun, kampus, semester, mata kuliah, tugas, catatan, nilai, presensi, e-learning, SIAK, skripsi, portofolio, pengaturan.</p>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <p class="font-bold text-slate-700">🖼️ uploads/avatars</p>
+          <p class="text-slate-500 mt-1">Foto profil mahasiswa dan administrator.</p>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <p class="font-bold text-slate-700">🏫 uploads/logos</p>
+          <p class="text-slate-500 mt-1">Logo situs dan logo kampus.</p>
+        </div>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <p class="font-bold text-slate-700">📎 uploads/files</p>
+          <p class="text-slate-500 mt-1">Lampiran soal, jawaban tugas, dan materi kuliah.</p>
+        </div>
+      </div>
+    </section>`;
+
+  document.getElementById('export-xii').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = '⏳ Menyiapkan arsip…';
+    try {
+      const filename = await downloadFile('/api/admin/database/export-xii', 'gradify-data.xii');
+      toast(`Export .xii diunduh: ${filename}`);
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '⬇️ Export Data (.xii)';
+    }
+  });
+
+  const fileInput = document.getElementById('import-xii-file');
+  const importBtn = document.getElementById('import-xii-btn');
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    importBtn.disabled = !file;
+    if (file && file.size > 250 * 1024 * 1024) {
+      importBtn.disabled = true;
+      toast('File .xii melebihi batas 250 MB.', 'error');
+    }
+  });
+
+  importBtn.addEventListener('click', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    if (!confirm('Import .xii akan MENGGANTI seluruh database dan upload saat ini. Backup database otomatis akan dibuat terlebih dahulu. Lanjutkan?')) return;
+
+    const fd = new FormData();
+    fd.append('backup', file);
+    importBtn.disabled = true;
+    importBtn.textContent = '⏳ Memulihkan data…';
+
+    try {
+      const res = await request('/api/admin/database/import-xii', { method: 'POST', form: fd });
+      const uploadInfo = res.uploads ? ` · ${res.uploads.restored} file upload dipulihkan` : '';
+      clearSession();
+      toast(`${res.message}${uploadInfo} Backup keamanan: ${res.safety_backup}`, 'success');
+      setTimeout(() => renderLogin('Data .xii berhasil dipulihkan. Silakan login kembali.'), 1500);
+    } catch (err) {
+      importBtn.disabled = false;
+      importBtn.textContent = '♻️ Import & Ganti Seluruh Data';
+      toast(err.message, 'error');
+    }
+  });
+}
+
+/* ============================================================
  * BACKUP & RESTORE
  * ============================================================ */
 async function loadBackup() {
@@ -1192,7 +1315,7 @@ async function loadBackup() {
           <button id="export-sqlite" class="a-btn a-btn-dark py-2.5">⬇️ Backup SQLite</button>
         </div>
         <p class="text-[11px] text-slate-400 mt-2">JSON mudah diperiksa dan dipindahkan; SQLite cocok untuk arsip penuh.</p>
-        <p class="text-[11px] text-rose-600 mt-2">🔒 Simpan file backup secara aman: file berisi akun dan hash password. File avatar di <code class="font-mono bg-slate-100 px-1 rounded">data/uploads</code> tidak termasuk dalam backup database.</p>
+        <p class="text-[11px] text-rose-600 mt-2">🔒 Simpan file backup secara aman: file berisi akun dan hash password. File avatar di <code class="font-mono bg-slate-100 px-1 rounded">data/uploads</code> tidak termasuk dalam backup database. Untuk menyertakan foto & seluruh upload, gunakan menu <b>Export / Import Data</b> (.xii).</p>
       </section>
 
       <section class="a-card p-5 border-amber-200">
