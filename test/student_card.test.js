@@ -4,6 +4,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'gradify-student-card-'));
+process.env.GRADIFY_DB_PATH = path.join(TMP_DIR, 'gradify.db');
 
 const { router: authRouter } = require('../server/routes/auth');
 const academicsRouter = require('../server/routes/academics');
@@ -28,6 +34,8 @@ test.before(async () => {
 
 test.after(async () => {
   if (server) await new Promise((resolve) => server.close(resolve));
+  try { db.close(); } catch { /* ignore */ }
+  fs.rmSync(TMP_DIR, { recursive: true, force: true });
 });
 
 async function registerStudent(overrides = {}) {

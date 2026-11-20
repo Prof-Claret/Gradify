@@ -323,3 +323,16 @@ pre code {
     border: 1px solid #e2e8f0 !important;
   }
 }
+
+/* Ikon SVG Lucide hasil konversi dari emoji */
+.g-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -0.15em;
+  line-height: 1;
+}
+.g-ic svg {
+  width: 1em;
+  height: 1em;
+}

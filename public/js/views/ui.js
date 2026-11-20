@@ -3,9 +3,9 @@
  */
 
 export function injectFormStyles() {
-  if (document.getElementById('g-form-style')) return;
+  if (document.getElementById('g-ui-style')) return;
   const s = document.createElement('style');
-  s.id = 'g-form-style';
+  s.id = 'g-ui-style';
   s.textContent = `.g-lbl{font-size:11px;font-weight:600;color:#475569;display:block;margin-bottom:4px}
   .g-inp{width:100%;border:1px solid #cbd5e1;border-radius:0.6rem;padding:0.55rem 0.8rem;font-size:0.85rem;outline:none;background:#fff}
   .g-inp:focus{border-color:#6366f1;box-shadow:0 0 0 3px #e0e7ff}

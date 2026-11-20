@@ -57,6 +57,7 @@ Fitur khusus muncul di sidebar sesuai program studi mahasiswa. Mahasiswa tidak d
 - Pengaturan situs: nama, tagline, email dukungan, pengumuman global, registrasi, kampus custom, dan target IPK default.
 - Mode pemeliharaan dengan pesan khusus; dashboard admin tetap dapat diakses.
 - Backup database ke JSON atau SQLite, restore dari file `.json`, `.db`, atau `.sqlite`, serta backup otomatis sebelum import.
+- **Export / Import Data (.xii)** — satu file arsip portabel berisi seluruh database (akun, nilai, tugas, catatan, pengaturan) dan semua upload (foto avatar, logo, lampiran tugas, materi kuliah).
 - Optimasi database dengan `VACUUM` dan pengelolaan backup otomatis.
 
 ## Teknologi
@@ -123,13 +124,27 @@ Fitur utama dashboard:
 - **Pengguna** — cari dan edit profil mahasiswa (termasuk kampus/fakultas/prodi via dropdown), jadikan administrator, reset password, atau hapus akun beserta datanya.
 - **Kampus & Prodi** — CRUD kampus, fakultas, dan prodi; aktif/nonaktifkan kampus; petakan fitur per prodi maupun per fakultas.
 - **Backup & Restore** — ekspor database ke JSON/SQLite, import backup, unduh backup otomatis, dan jalankan `VACUUM`.
+- **Export / Import Data (.xii)** — unduh seluruh data (database + foto + upload) dalam satu file `.xii`, lalu pulihkan di server lain. Import membuat backup database otomatis dan menghentikan semua sesi login.
 - **Pengaturan** — identitas situs, email dukungan, pengumuman global, registrasi, kampus custom, target IPK default, serta mode pemeliharaan.
 
 Catatan keamanan backup:
 
 - File backup berisi akun dan hash password. Simpan di tempat aman dan jangan dibagikan.
-- Backup database tidak menyertakan file avatar di `data/uploads`. Salin folder tersebut secara terpisah jika ingin memindahkan seluruh aset.
+- Backup database JSON/SQLite tidak menyertakan file avatar di `data/uploads`. Gunakan **Export / Import Data (.xii)** jika ingin memindahkan database beserta seluruh foto dan upload.
 - Import akan mengganti seluruh data, membuat backup otomatis di `data/backups/`, dan menghentikan semua sesi login.
+
+### Format arsip `.xii`
+
+File `.xii` adalah container ZIP dengan isi:
+
+- `manifest.json` — metadata, versi format, jumlah tabel/file, dan checksum SHA-256.
+- `database.json` — seluruh tabel: akun, kampus, semester, mata kuliah, tugas, catatan, nilai, presensi, e-learning, SIAK, skripsi, portofolio, dan pengaturan.
+- `uploads/avatars/` — foto profil mahasiswa dan administrator.
+- `uploads/logos/` — logo situs dan logo kampus.
+- `uploads/files/` — lampiran soal, jawaban tugas, dan materi kuliah.
+- `README.txt` — penjelasan singkat format.
+
+Import `.xii` hanya dapat dilakukan administrator, maksimal 250 MB, memvalidasi checksum dan path file, serta hanya memulihkan file yang sesuai pola nama resmi Gradify.
 
 ## API Utama
 
@@ -143,6 +158,7 @@ Catatan keamanan backup:
 | Catatan | `/api/notes/*` | Daftar, pembuatan, pembaruan, dan penghapusan catatan |
 | Kehidupan | `/api/life/*` | Anggaran, skripsi, dan portfolio |
 | Admin | `/api/admin/*` | Setup/login admin, statistik, pengguna, kampus/fakultas/prodi, pemetaan fitur, pengaturan, dan backup/restore |
+| Export/Import `.xii` | `GET /api/admin/database/export-xii`, `POST /api/admin/database/import-xii` | Arsip `.xii` berisi database + seluruh upload (maks. 250 MB); admin-only |
 
 Contoh pemeriksaan kesehatan aplikasi:
 
@@ -169,9 +185,11 @@ Gradify/
 │   ├── index.js
 │   ├── db.js
 │   ├── routes/
-│   │   └── admin.js
+│   │   ├── admin.js
+│   │   └── ...
 │   └── utils/
-│       └── settings.js
+│       ├── settings.js
+│       └── xiiArchive.js
 ├── test/
 ├── data/
 ├── PRD.md

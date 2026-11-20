@@ -15,7 +15,7 @@
 | 2 | Pemisahan modul tools per prodi (lanjutan dari #1) | ⬜ Belum mulai | 🔴 Tinggi | Setelah #1 |
 | 3 | Panel Admin: Kelola Kampus, Fakultas & Prodi | ⬜ Belum mulai | 🔴 Tinggi | Setelah #1 |
 | 4 | **Presensi, Tugas Upload, E-Learning & SIAK** | ✅ Selesai | 🔴 Tinggi | Selesai |
-| 5 | _TBD — next feature_ | ⬜ Belum mulai | 🟡 Sedang | — |
+| 5 | **Export / Import Data (.xii)** | ✅ Selesai | 🔴 Tinggi | Selesai |
 
 > 📝 Catatan: daftar #4 dan seterusnya akan diisi setelah fitur #1–#3 selesai.
 
@@ -484,4 +484,55 @@ Menambahkan fitur yang lazim ada di situs e-learning dan SIAK kampus, serta memp
 
 ---
 
-_Dokumen ini akan diperbarui seiring progres. Terakhir diperbarui: 19 November 2026._
+# ✅ Feature #5 — Export / Import Data (.xii)
+
+**Status:** ✅ Selesai
+
+## Tujuan
+
+Menyediakan satu file portabel berisi **seluruh data Gradify** — database (termasuk akun), foto avatar, logo, lampiran tugas, dan materi kuliah — sehingga mudah dipindahkan antar server atau dijadikan arsip.
+
+## 5.1 Format `.xii`
+
+File `.xii` adalah container ZIP dengan isi:
+
+| Entry | Isi |
+|-------|-----|
+| `manifest.json` | Format, versi, waktu ekspor, jumlah tabel/file, checksum SHA-256 |
+| `database.json` | Seluruh tabel: akun, kampus, semester, mata kuliah, tugas, catatan, nilai, presensi, e-learning, SIAK, skripsi, portofolio, pengaturan |
+| `uploads/avatars/` | Foto profil mahasiswa & administrator |
+| `uploads/logos/` | Logo situs & kampus |
+| `uploads/files/` | Lampiran soal, jawaban tugas, materi kuliah |
+| `README.txt` | Penjelasan format |
+
+## 5.2 API
+
+| Method | Endpoint | Fungsi |
+|--------|----------|--------|
+| `GET` | `/api/admin/database/export-xii` | Unduh arsip `.xii` (database + seluruh upload) |
+| `POST` | `/api/admin/database/import-xii` | Pulihkan arsip `.xii` (maks. 250 MB) |
+
+## 5.3 Dashboard Admin
+
+- Tab baru **📦 Export / Import Data**.
+- Tombol **Export Data (.xii)** dan **Import & Ganti Seluruh Data**.
+- Import otomatis membuat backup database di `data/backups/` dan menghentikan semua sesi login.
+- Peringatan keamanan karena arsip berisi akun dan hash password.
+
+## 5.4 Keamanan
+
+- Admin-only.
+- Validasi format, versi, checksum SHA-256, dan struktur tabel.
+- Perlindungan path traversal & path absolut.
+- Hanya memulihkan file upload yang sesuai pola nama resmi Gradify.
+- Batas 250 MB dan batas jumlah entri/ukuran ekstrak untuk mencegah zip bomb.
+- Backup database otomatis sebelum import.
+
+## 5.5 Test
+
+- 6 test baru di `test/xii_export.test.js`: export, import, penolakan file non-`.xii`, checksum salah, path traversal, dan path absolut.
+- Total **35 test lulus**.
+
+---
+
+_Dokumen ini akan diperbarui seiring progres. Terakhir diperbarui: 20 November 2026._

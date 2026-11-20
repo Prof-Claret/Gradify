@@ -21,7 +21,9 @@ const sharp = require('sharp');
 /* ============================================================
  * DIRECTORY SETUP
  * ============================================================ */
-const UPLOAD_DIR = path.resolve(__dirname, '..', '..', 'data', 'uploads', 'avatars');
+const UPLOAD_DIR = process.env.GRADIFY_AVATAR_DIR
+  ? path.resolve(process.env.GRADIFY_AVATAR_DIR)
+  : path.resolve(__dirname, '..', '..', 'data', 'uploads', 'avatars');
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true, mode: 0o755 });
 }

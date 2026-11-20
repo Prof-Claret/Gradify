@@ -5,9 +5,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 const http = require('node:http');
 const sharp = require('sharp');
 const express = require('express');
+
+const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'gradify-avatar-api-'));
+process.env.GRADIFY_DB_PATH = path.join(TMP_DIR, 'gradify.db');
+process.env.GRADIFY_AVATAR_DIR = path.join(TMP_DIR, 'uploads', 'avatars');
 
 const { router: authRouter } = require('../server/routes/auth');
 const { db } = require('../server/db');
@@ -35,6 +40,8 @@ test.after(async () => {
   if (server) {
     await new Promise((resolve) => server.close(resolve));
   }
+  try { db.close(); } catch { /* ignore */ }
+  fs.rmSync(TMP_DIR, { recursive: true, force: true });
 });
 
 // Helper to create test multipart body
